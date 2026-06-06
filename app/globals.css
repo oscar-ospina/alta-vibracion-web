@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@import "@saas/ui/theme.css";
+@source "../node_modules/@saas/ui";
+
+/*
+ * @saas/ui's semantic layer already maps the DS font roles:
+ *   --font-sans → var(--font-open-sans)   --font-display → var(--font-archivo)
+ * We only supply those two font variables — see app/layout.tsx (next/font).
+ * Light-only: the DS ships no dark palette (deferred theming epic).
+ */
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
