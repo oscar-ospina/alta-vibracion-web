@@ -23,7 +23,9 @@ const iconLinkClass = `${linkClass} p-2`;
  */
 export function Footer() {
   return (
-    <footer className="mt-12 border-t border-neutral-100 bg-card">
+    <footer className="mt-12 border-t border-neutral-100 bg-card pb-16">
+      {/* Extra bottom padding reserves room for the fixed WhatsApp FAB (#23) so it
+          never covers the footer's bottom-right content at any width. */}
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-7 sm:flex-row sm:justify-between sm:gap-4 sm:px-6 lg:px-10">
         <Logo variant="horizontal" className="h-[30px] w-auto" />
 

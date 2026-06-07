@@ -3,6 +3,7 @@ import { Archivo, Open_Sans } from "next/font/google";
 import "./globals.css";
 import { TopBar } from "@/components/layout/top-bar";
 import { Footer } from "@/components/layout/footer";
+import { WhatsappFab } from "@/components/layout/whatsapp-fab";
 
 // Self-hosted at build time, wired to the variable names @saas/ui's theme expects
 // (--font-archivo → --font-display, --font-open-sans → --font-sans).
@@ -56,6 +57,7 @@ export default function RootLayout({
           {children}
         </main>
         <Footer />
+        <WhatsappFab />
       </body>
     </html>
   );
