@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { Mail, MessageCircle, Phone } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
-import { CONTACT, ROUTES, whatsappUrl } from "@/lib/site";
+import { ROUTES, SOCIAL } from "@/lib/site";
 
 const LEGAL_LINKS = [
   { href: ROUTES.contact, label: "Contacto" },
@@ -12,57 +11,65 @@ const LEGAL_LINKS = [
 const linkClass =
   "inline-flex rounded-md transition-colors hover:text-foreground focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-// Icon-only links: pad to a ≥24×24 tap target (WCAG 2.5.8) so it doesn't rely on
-// the spacing exception, and reads better on touch. 20px icon + p-2 (16px) = 36px.
-const iconLinkClass = `${linkClass} p-2`;
-
 /**
- * Site footer on every route (story oscar-ospina/saas-planner#21): brand logo,
- * legal/contact links, and a contact icon row. WhatsApp is wired; mail/phone
- * point to the contact page until the real email/phone land (#26). Server component.
+ * Site footer on every route (stories oscar-ospina/saas-planner#21 / #36). Faithful to
+ * the Figma design: logo + "Síguenos" social row · divider · legal links + copyright.
+ * The contact channels (correo / teléfono / WhatsApp) live on the /contact page (linked
+ * here) and the WhatsApp FAB — the footer mirrors the design's social-first layout
+ * rather than duplicating the contact icons. Server component.
  */
 export function Footer() {
   return (
     <footer className="mt-12 border-t border-neutral-100 bg-card pb-16">
-      {/* Extra bottom padding reserves room for the fixed WhatsApp FAB (#23) so it
-          never covers the footer's bottom-right content at any width. */}
-      <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-7 sm:flex-row sm:justify-between sm:gap-4 sm:px-6 lg:px-10">
-        <Logo variant="horizontal" className="h-[30px] w-auto" />
+      {/* pb-16 reserves room for the fixed WhatsApp FAB (#23) at the bottom-right. */}
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-10">
+        {/* Row 1: logo + "Síguenos" / social */}
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between sm:gap-4">
+          <Logo variant="horizontal" className="h-[30px] w-auto" />
 
-        <nav
-          aria-label="Enlaces legales y de contacto"
-          className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground"
-        >
-          {LEGAL_LINKS.map((l) => (
-            <Link key={l.href} href={l.href} className={linkClass}>
-              {l.label}
-            </Link>
-          ))}
-        </nav>
-
-        <ul className="-mr-2 flex items-center gap-1 text-muted-foreground">
-          <li>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-foreground">Síguenos</span>
             <a
-              href={whatsappUrl()}
+              href={SOCIAL.instagram}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Escríbenos por WhatsApp"
-              className={iconLinkClass}
+              aria-label="Síguenos en Instagram"
+              className={`${linkClass} transition-transform hover:scale-105`}
             >
-              <MessageCircle className="size-5" aria-hidden />
+              {/* Brand social glyph from Figma — self-contained #3D3F4F circle + mark.
+                  Plain <img> keeps the SVG its own document (no gradient-id clashes). */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/social-instagram.svg"
+                alt=""
+                aria-hidden
+                width={32}
+                height={32}
+                className="size-8"
+              />
             </a>
-          </li>
-          <li>
-            <a href={`mailto:${CONTACT.email}`} aria-label="Escríbenos por correo" className={iconLinkClass}>
-              <Mail className="size-5" aria-hidden />
-            </a>
-          </li>
-          <li>
-            <a href={`tel:${CONTACT.phone}`} aria-label="Llámanos" className={iconLinkClass}>
-              <Phone className="size-5" aria-hidden />
-            </a>
-          </li>
-        </ul>
+          </div>
+        </div>
+
+        <hr className="border-neutral-100" />
+
+        {/* Row 2: legal links + copyright */}
+        <div className="flex flex-col items-center gap-4 text-sm text-muted-foreground sm:flex-row sm:justify-between sm:gap-4">
+          <nav
+            aria-label="Enlaces legales"
+            className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
+          >
+            {LEGAL_LINKS.map((l) => (
+              <Link key={l.href} href={l.href} className={linkClass}>
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+
+          <p className="text-xs">
+            © 2026 Alta Vibración. Todos los derechos reservados.
+          </p>
+        </div>
       </div>
     </footer>
   );
