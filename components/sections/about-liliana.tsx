@@ -9,10 +9,10 @@ import { Badge } from "@saas/ui";
  * picks them up); on mobile they fall back to a centered wrapped row below the photo.
  */
 const CHIPS = [
-  { label: "📖 Autoconocimiento", pos: "md:absolute md:left-[-7%] md:top-[9%]" },
-  { label: "✨ Energía", pos: "md:absolute md:right-[-6%] md:top-[27%]" },
-  { label: "🧘‍♂️ Revelaciones", pos: "md:absolute md:left-[-7%] md:bottom-[26%]" },
-  { label: "🔮 Precisión", pos: "md:absolute md:right-[-5%] md:bottom-[9%]" },
+  { emoji: "📖", label: "Autoconocimiento", pos: "md:absolute md:left-[-7%] md:top-[9%]" },
+  { emoji: "✨", label: "Energía", pos: "md:absolute md:right-[-2%] md:top-[27%] lg:right-[-6%]" },
+  { emoji: "🧘‍♂️", label: "Revelaciones", pos: "md:absolute md:left-[-7%] md:bottom-[26%]" },
+  { emoji: "🔮", label: "Precisión", pos: "md:absolute md:right-[-1%] md:bottom-[9%] lg:right-[-5%]" },
 ];
 
 /**
@@ -50,7 +50,7 @@ export function AboutLiliana() {
         <details open>
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-xl py-1 focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
             <span className="font-display text-3xl font-semibold text-foreground sm:text-4xl">
-              ✨ Todo tiene sentido
+              <span aria-hidden="true">✨</span> Todo tiene sentido
             </span>
             {/* Rotates with the <details> open state. group-open isn't a Tailwind v4
                 variant, so target the [open] ancestor directly; transition the `rotate`
@@ -91,12 +91,14 @@ export function AboutLiliana() {
               className="object-cover"
             />
           </div>
-          <ul className="mt-4 flex flex-wrap justify-center gap-2 md:mt-0 md:contents">
+          {/* role="list" re-asserts list semantics that md:contents (display:contents) strips. */}
+          <ul role="list" className="mt-4 flex flex-wrap justify-center gap-2 md:mt-0 md:contents">
             {CHIPS.map((c) => (
               <li
                 key={c.label}
-                className={`inline-flex items-center rounded-[18px] bg-white px-3.5 py-2 text-sm font-semibold text-foreground shadow-[0_0_11px_rgba(51,16,10,0.15)] sm:text-base ${c.pos}`}
+                className={`inline-flex items-center gap-1.5 rounded-[18px] bg-white px-3.5 py-2 text-sm font-semibold text-foreground shadow-[0_0_11px_rgba(51,16,10,0.15)] sm:text-base ${c.pos}`}
               >
+                <span aria-hidden="true">{c.emoji}</span>
                 {c.label}
               </li>
             ))}
