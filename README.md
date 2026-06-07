@@ -4,9 +4,13 @@ The **Alta Vibración** consumer web app — the online numerology practice of *
 
 > *"No es casualidad. Es vibración."*
 
-**Current scope — marketing landing MVP** ([epic #16](https://github.com/oscar-ospina/saas-planner/issues/16) — **complete & closed 2026-06-07**): a Home landing that explains numerology, builds trust in Liliana, and converts visitors via **WhatsApp/contact**, plus legal pages. Real in-app booking (*Agenda*) and checkout (*Pago*) plus their backend are a deferred follow-up; the MVP routes booking intent to WhatsApp.
+**Status — two epics shipped, booking is next:**
 
-**Shipped:** Home (hero + WhatsApp FAB, trust sections, consultations grid with per-cita *Agendar* → WhatsApp), shared shell (TopBar/Footer/skip-link), brand layer (logo/fonts/tokens), legal pages (Términos / Política de Privacidad / Contacto), SEO (sitemap/robots/OpenGraph), Vercel Web Analytics with per-CTA conversion events, es-CO formatting, and a WCAG 2.2 AA pass (3px focus ring, AA contrast, keyboard-reachable).
+- ✅ **Marketing landing MVP** ([epic #16](https://github.com/oscar-ospina/saas-planner/issues/16), closed 2026-06-07): a Home landing that explains numerology, builds trust in Liliana, and converts visitors via **WhatsApp/contact**, plus legal pages.
+- ✅ **Landing visual fidelity to Figma** ([epic #35](https://github.com/oscar-ospina/saas-planner/issues/35), closed 2026-06-07): the Home sections were brought to **design fidelity** against the Figma `UI-Exercise` — hero gradient «esencia» + line-art decoration (#37), the «¿Por qué Numerología?» bleed cosmic card with line-art faces (#38), and the «¿Quién es Liliana Tobón?» accordion + floating chips (#39).
+- ▶ **Next — booking & checkout** ([epic #31](https://github.com/oscar-ospina/saas-planner/issues/31)): real in-app *Agenda* (Phase 1 = booking-only via **Google Calendar**, backend in this repo's Route Handlers/Server Actions) then *Pago* (Phase 2). Spikes [#32](https://github.com/oscar-ospina/saas-planner/issues/32) (Google Calendar) + [#33](https://github.com/oscar-ospina/saas-planner/issues/33) (backend/data) come first. Until it lands, the landing routes booking intent to WhatsApp.
+
+**Shipped:** Home (Figma-faithful hero + WhatsApp FAB, trust sections, consultations grid with per-cita *Agendar* → WhatsApp), shared shell (TopBar/Footer/skip-link), brand layer (logo/fonts/tokens), legal pages (Términos / Política de Privacidad / Contacto), SEO (sitemap/robots/OpenGraph), Vercel Web Analytics with per-CTA conversion events, es-CO formatting, and a WCAG 2.2 AA pass (3px focus ring, AA contrast, keyboard-reachable).
 
 **⚠️ Before public launch** (none block the epic): fill the 14 `[POR CONFIRMAR: …]` placeholders in `content/terms.md` + `content/privacy.md` and have the legal copy reviewed (then drop the `<DraftNotice>` banner); set the real production host via `NEXT_PUBLIC_SITE_URL` (a subdomain of `resuelv.com`; default `altavibracion.resuelv.com`) and deploy on Vercel; add a static OpenGraph image.
 
