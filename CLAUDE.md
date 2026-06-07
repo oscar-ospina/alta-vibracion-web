@@ -13,7 +13,15 @@ feat: <summary> (oscar-ospina/saas-planner#<n>)
 # PR body: Closes oscar-ospina/saas-planner#<n>
 ```
 
-Current epic: **[#16](https://github.com/oscar-ospina/saas-planner/issues/16)** — marketing landing MVP.
+Current epic: **[#16](https://github.com/oscar-ospina/saas-planner/issues/16)** — marketing landing MVP, **complete & closed 2026-06-07** (all stories #17–#26 merged; Home landing + legal pages feature-complete). No active epic; next is the deferred **booking & checkout** epic. See [README → scope](README.md) for shipped features + the pre-launch checklist.
+
+## Gotchas worth knowing (from building the MVP)
+
+- **Legal copy is a BORRADOR.** `content/{terms,privacy}.md` still carry 14 `[POR CONFIRMAR: …]` placeholders + a `<DraftNotice>` banner; they must be filled and legally reviewed before public launch (Ley 1581 / Habeas Data). Contact page channels are real (from `lib/site.ts`).
+- **Legal content pipeline:** copy lives as Markdown in `content/*.md`, read at **build time** via `lib/legal.ts` (`readLegalDoc`, fs) and rendered with `react-markdown` in `components/sections/prose.tsx`. The pages stay statically prerendered, so there's no runtime fs; raw HTML is left disabled (the .md is trusted, in-repo).
+- **Production host is env-driven.** `NEXT_PUBLIC_SITE_URL` (default `https://altavibracion.resuelv.com`) drives `metadataBase`/sitemap/robots — set the real `resuelv.com` subdomain in Vercel at deploy; no code change needed.
+- **Focus ring:** `app/brand.css` has an unlayered `[data-slot="button"]:focus-visible` outline rule — a deliberate consumer compensation because the `@saas/ui` Button's own box-shadow focus ring does **not** render in this Tailwind v4 build (DS bug, [planner #30](https://github.com/oscar-ospina/saas-planner/issues/30)). Keep it until #30 lands. Other interactive elements use `focus-visible:outline-[3px] outline-ring` directly.
+- **CTA conversion tracking** goes through the `BookingButton` client island (+ the FAB) → `track("book_consultation", { source })`; keep new WhatsApp CTAs on that path so they're attributed.
 
 ## Stack & conventions
 
