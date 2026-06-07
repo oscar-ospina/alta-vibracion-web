@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Mail, MessageCircle, Phone } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
-import { ROUTES, whatsappUrl } from "@/lib/site";
+import { CONTACT, ROUTES, whatsappUrl } from "@/lib/site";
 
 const LEGAL_LINKS = [
   { href: ROUTES.contact, label: "Contacto" },
@@ -51,14 +51,14 @@ export function Footer() {
             </a>
           </li>
           <li>
-            <Link href={ROUTES.contact} aria-label="Correo de contacto" className={iconLinkClass}>
+            <a href={`mailto:${CONTACT.email}`} aria-label="Escríbenos por correo" className={iconLinkClass}>
               <Mail className="size-5" aria-hidden />
-            </Link>
+            </a>
           </li>
           <li>
-            <Link href={ROUTES.contact} aria-label="Teléfono de contacto" className={iconLinkClass}>
+            <a href={`tel:${CONTACT.phone}`} aria-label="Llámanos" className={iconLinkClass}>
               <Phone className="size-5" aria-hidden />
-            </Link>
+            </a>
           </li>
         </ul>
       </div>
