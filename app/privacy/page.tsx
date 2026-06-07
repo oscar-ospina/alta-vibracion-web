@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { DraftNotice } from "@/components/sections/draft-notice";
+import { Prose } from "@/components/sections/prose";
+import { readLegalDoc } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Política de Privacidad",
@@ -7,13 +10,16 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPage() {
+  const content = readLegalDoc("privacy");
   return (
-    <section className="mx-auto max-w-3xl px-6 py-16">
+    <article className="mx-auto max-w-3xl px-6 py-16">
       <h1 className="text-3xl font-bold text-foreground">Política de Privacidad</h1>
-      <p className="mt-4 text-muted-foreground">
-        Contenido próximamente — esta página se completa en la historia
-        oscar-ospina/saas-planner#26.
-      </p>
-    </section>
+      <div className="mt-6">
+        <DraftNotice />
+      </div>
+      <div className="mt-8">
+        <Prose>{content}</Prose>
+      </div>
+    </article>
   );
 }
