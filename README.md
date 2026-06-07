@@ -37,13 +37,16 @@ npm run dev        # http://localhost:3000
 Other scripts:
 
 ```bash
-npm run build      # next build (static-by-default; marketing pages prerender)
-npm run start      # serve the production build
-npm run lint       # eslint (flat config)
-npm run typecheck  # tsc --noEmit
+npm run build         # next build (static-by-default; marketing pages prerender)
+npm run start         # serve the production build
+npm run lint          # eslint (flat config)
+npm run typecheck     # tsc --noEmit
+npm run smoke:calendar # live Google Calendar check (booking #40 — needs creds)
 ```
 
 Requires **Node ≥ 20.9** (Next 16). CI (`.github/workflows/ci.yml`) runs lint + typecheck + build on every push and PR.
+
+**Booking (Google Calendar) setup.** The Agenda flow (epic #31) needs a Google service-account key and Liliana's shared calendar — a one-time setup with its own runbook: **[`docs/booking-setup.md`](docs/booking-setup.md)**. Required server-side env vars (`GOOGLE_SERVICE_ACCOUNT_KEY_B64`, `LILIANA_CALENDAR_ID`) are in `.env.example`. The site builds and runs without them; only the live booking calls need credentials.
 
 ## Layout
 
@@ -61,7 +64,9 @@ components/
 ├── layout/               # top-bar, footer, whatsapp-fab
 └── sections/             # hero, why-numerology, about-liliana, consultations, prose, draft-notice
 content/                  # terms.md / privacy.md / contact.md — legal copy, read at build (static)
-lib/                      # site.ts (routes/contact/whatsapp/SITE_URL), consultations.ts, legal.ts
+lib/                      # site.ts (routes/contact/whatsapp/SITE_URL), consultations.ts, legal.ts, calendar.ts
+scripts/                  # smoke-calendar.ts — live Google Calendar smoke-test (dev-only)
+docs/                     # booking-setup.md — Google Calendar setup runbook
 ```
 
 ## Notes
