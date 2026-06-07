@@ -209,8 +209,13 @@ export function deterministicSlotId(calendarId: string, slotStart: Date): string
 type GoogleApiErrorShape = {
   code?: number | string;
   status?: number;
+  /** Legacy googleapis (<v8) exposed reasons at the top level. */
   errors?: Array<{ reason?: string }>;
-  response?: { status?: number };
+  response?: {
+    status?: number;
+    /** gaxios v7 (googleapis 173) carries reasons here, AIP-193 style. */
+    data?: { error?: { errors?: Array<{ reason?: string }> } };
+  };
 };
 
 function httpStatusOf(err: unknown): number | undefined {
@@ -233,7 +238,13 @@ function isRetryable(err: unknown): boolean {
   if (status === 429) return true;
   if (status !== undefined && status >= 500) return true;
   if (status === 403) {
-    const reasons = (err as GoogleApiErrorShape).errors?.map((x) => x.reason) ?? [];
+    // googleapis 173 throws gaxios v7 errors that carry the reasons at
+    // response.data.error.errors; older versions used a top-level errors[].
+    // Read both so the ADR's "backoff on 403/429" holds across versions.
+    const e = err as GoogleApiErrorShape;
+    const reasons = (e.response?.data?.error?.errors ?? e.errors ?? []).map(
+      (x) => x.reason,
+    );
     return reasons.some(
       (r) => r === "rateLimitExceeded" || r === "userRateLimitExceeded",
     );

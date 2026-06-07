@@ -101,73 +101,82 @@ async function main(): Promise<void> {
     description: "Evento de prueba del smoke-test de Agenda (#40). Se elimina solo.",
     privateProps: { canal: "smoke-test" },
   });
-  console.log(
-    `      created id          = ${created.id}\n` +
-      `      returned start      = ${created.start?.dateTime} (tz ${created.start?.timeZone})\n` +
-      `      htmlLink            = ${created.htmlLink ?? "(n/a)"}`,
-  );
-  if (created.id !== expectedId) {
-    throw new Error(`created id ${created.id} != expected deterministic id ${expectedId}`);
-  }
-  const sentLocal = toBogotaRFC3339(start);
-  const okBogota = created.start?.dateTime?.startsWith(sentLocal.slice(0, 16));
-  console.log(
-    okBogota
-      ? "      ✓ Bogotá time round-tripped correctly (UTC-5)."
-      : `      ⚠️  Bogotá time mismatch — sent ${sentLocal}, got ${created.start?.dateTime}`,
-  );
 
-  // 3. IDEMPOTENCY — re-insert the same id, expect a 409 (no second event).
-  console.log(`\n3️⃣  re-insert same id → expecting 409 duplicate…`);
-  let got409 = false;
+  // The test event now exists. From here, ANY failure must clean it up before exiting,
+  // otherwise the deterministic id orphans the slot and same-day re-runs 409 at insert.
   try {
-    await insertTimeBlock({
-      start,
-      end,
-      summary: "🧪 AV smoke-test — duplicate (no debería crearse)",
-    });
-  } catch (err) {
-    if (err instanceof DuplicateEventError || isDuplicateError(err)) {
-      got409 = true;
-      console.log("      ✓ 409 duplicate → idempotency confirmed (no second event).");
-    } else {
-      throw err;
-    }
-  }
-  if (!got409) {
-    // A second event slipped through — clean BOTH up and fail loudly.
-    await safeDelete(expectedId);
-    throw new Error("re-insert did NOT 409 — idempotency/double-book guard is broken.");
-  }
-
-  // 4. CLEANUP — delete the test event.
-  console.log(`\n4️⃣  events.delete → removing the test event…`);
-  await deleteEvent(expectedId);
-  console.log("      ✓ test event deleted.");
-
-  // 5. INFO — resolve the ADR's open "delete-then-rebook id reuse" question (#33/#43).
-  console.log(`\n5️⃣  (info) re-insert the deleted id → is a deleted id reusable?`);
-  try {
-    const reused = await insertTimeBlock({
-      start,
-      end,
-      summary: "🧪 AV smoke-test — id reuse probe",
-    });
     console.log(
-      "      → REUSABLE: Google accepted the deleted id. #43 can rely on query-first; " +
-        "no salt strictly required for the cancel→rebook edge.",
+      `      created id          = ${created.id}\n` +
+        `      returned start      = ${created.start?.dateTime} (tz ${created.start?.timeZone})\n` +
+        `      htmlLink            = ${created.htmlLink ?? "(n/a)"}`,
     );
-    await safeDelete(reused.id ?? expectedId);
-    console.log("      ✓ probe event deleted.");
-  } catch (err) {
-    if (err instanceof DuplicateEventError || isDuplicateError(err)) {
-      console.log(
-        "      → NOT reusable: deleted id still 409s. #43 MUST salt the id (nonce) or " +
-          "query-first so a genuinely free slot isn't rejected after a cancellation.",
-      );
-    } else {
-      throw err;
+    if (created.id !== expectedId) {
+      throw new Error(`created id ${created.id} != expected deterministic id ${expectedId}`);
     }
+    const sentLocal = toBogotaRFC3339(start);
+    const okBogota = created.start?.dateTime?.startsWith(sentLocal.slice(0, 16)) ?? false;
+    if (!okBogota) {
+      // The classic UTC-5 off-by-5h bug — fatal, this is the headline thing to verify.
+      throw new Error(
+        `Bogotá time round-trip FAILED — sent ${sentLocal}, got ${created.start?.dateTime ?? "(null)"}`,
+      );
+    }
+    console.log("      ✓ Bogotá time round-tripped correctly (UTC-5).");
+
+    // 3. IDEMPOTENCY — re-insert the same id, expect a 409 (no second event).
+    console.log(`\n3️⃣  re-insert same id → expecting 409 duplicate…`);
+    let got409 = false;
+    try {
+      await insertTimeBlock({
+        start,
+        end,
+        summary: "🧪 AV smoke-test — duplicate (no debería crearse)",
+      });
+    } catch (err) {
+      if (err instanceof DuplicateEventError || isDuplicateError(err)) {
+        got409 = true;
+        console.log("      ✓ 409 duplicate → idempotency confirmed (no second event).");
+      } else {
+        throw err;
+      }
+    }
+    if (!got409) {
+      throw new Error("re-insert did NOT 409 — idempotency/double-book guard is broken.");
+    }
+
+    // 4. CLEANUP — delete the test event.
+    console.log(`\n4️⃣  events.delete → removing the test event…`);
+    await deleteEvent(expectedId);
+    console.log("      ✓ test event deleted.");
+
+    // 5. INFO — resolve the ADR's open "delete-then-rebook id reuse" question (#33/#43).
+    console.log(`\n5️⃣  (info) re-insert the deleted id → is a deleted id reusable?`);
+    try {
+      const reused = await insertTimeBlock({
+        start,
+        end,
+        summary: "🧪 AV smoke-test — id reuse probe",
+      });
+      console.log(
+        "      → REUSABLE: Google accepted the deleted id. #43 can rely on query-first; " +
+          "no salt strictly required for the cancel→rebook edge.",
+      );
+      await safeDelete(reused.id ?? expectedId);
+      console.log("      ✓ probe event deleted.");
+    } catch (err) {
+      if (err instanceof DuplicateEventError || isDuplicateError(err)) {
+        console.log(
+          "      → NOT reusable: deleted id still 409s. #43 MUST salt the id (nonce) or " +
+            "query-first so a genuinely free slot isn't rejected after a cancellation.",
+        );
+      } else {
+        throw err;
+      }
+    }
+  } catch (err) {
+    // Best-effort cleanup so a failed run leaves no orphan on the real calendar.
+    await safeDelete(expectedId);
+    throw err;
   }
 
   console.log(`\n✅ Smoke-test passed. The Google Calendar integration works live.\n`);
