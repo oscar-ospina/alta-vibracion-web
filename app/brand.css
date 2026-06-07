@@ -51,11 +51,10 @@
   /* The DS Button's own keyboard-focus ring (`focus-visible:ring-[3px] ring-ring/50`,
      a box-shadow) does NOT render in this Tailwind v4 consumer, so its CTAs would ship
      with no visible focus indicator (WCAG 2.4.7 fail). This unlayered rule restores a
-     visible 3px ring. NOTE: an opaque Tailwind v4 / Lightning-CSS interaction pins this
-     button's `outline-color` to currentColor (orange-900 ink) regardless of what we set —
-     so the ring renders dark-orange rather than the bright orange-500 the other elements
-     use. It is still a clearly visible, high-contrast orange ring (orange-900 vs the light
-     page ≫ 3:1 ✅ WCAG 1.4.11). The exact-hue + DS-ring root cause are tracked in saas-planner. */
+     visible 3px orange ring (`--color-ring` = orange-500, #f0601f) on every DS button —
+     verified by headless focus screenshots to render clearly on both the light surfaces
+     and the dark hero scrim, and not clipped inside Cards. DS root cause (the Button's
+     box-shadow ring failing to render in a v4 consumer) is tracked in saas-planner#30. */
   outline: 3px solid var(--color-ring);
   outline-offset: 2px;
 }
