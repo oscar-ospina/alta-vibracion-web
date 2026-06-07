@@ -10,7 +10,7 @@ const LEGAL_LINKS = [
 ];
 
 const linkClass =
-  "inline-flex rounded-md transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  "inline-flex rounded-md transition-colors hover:text-foreground focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 // Icon-only links: pad to a ≥24×24 tap target (WCAG 2.5.8) so it doesn't rely on
 // the spacing exception, and reads better on touch. 20px icon + p-2 (16px) = 36px.

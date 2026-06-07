@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Contacto" };
+export const metadata: Metadata = {
+  title: "Contacto",
+  description:
+    "Escríbenos por WhatsApp, correo o teléfono para agendar tu consulta de numerología con Liliana Tobón.",
+};
 
 export default function ContactPage() {
   return (

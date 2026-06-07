@@ -1,7 +1,6 @@
 import Image from "next/image";
 import { Calendar } from "lucide-react";
-import { Button } from "@saas/ui";
-import { whatsappUrl } from "@/lib/site";
+import { BookingButton } from "@/components/brand/booking-button";
 
 /**
  * Home hero (story oscar-ospina/saas-planner#23): cosmic backdrop + dark scrim,
@@ -39,12 +38,10 @@ export function Hero() {
             propósito.
           </p>
           <div className="mt-8">
-            <Button size="lg" asChild>
-              <a href={whatsappUrl()} target="_blank" rel="noopener noreferrer">
-                <Calendar className="size-5" aria-hidden />
-                Agenda tu cita
-              </a>
-            </Button>
+            <BookingButton source="hero" size="lg">
+              <Calendar className="size-5" aria-hidden />
+              Agenda tu cita
+            </BookingButton>
           </div>
         </div>
       </div>

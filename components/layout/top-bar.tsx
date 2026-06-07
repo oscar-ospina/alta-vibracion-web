@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { Button } from "@saas/ui";
 import { Logo } from "@/components/brand/logo";
-import { whatsappUrl } from "@/lib/site";
+import { BookingButton } from "@/components/brand/booking-button";
 
 /**
  * Sticky top bar on every route (story oscar-ospina/saas-planner#21): brand logo
@@ -16,17 +15,15 @@ export function TopBar() {
         <Link
           href="/"
           aria-label="Alta Vibración — Inicio"
-          className="inline-flex shrink-0 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="inline-flex shrink-0 rounded-md focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           <Logo variant="mark" href={null} className="h-8 w-auto md:hidden" />
           <Logo variant="horizontal" href={null} className="hidden h-9 w-auto md:block" />
         </Link>
 
-        <Button size="sm" asChild>
-          <a href={whatsappUrl()} target="_blank" rel="noopener noreferrer">
-            Agenda tu cita
-          </a>
-        </Button>
+        <BookingButton source="top_bar" size="sm">
+          Agenda tu cita
+        </BookingButton>
       </div>
     </header>
   );
