@@ -53,20 +53,25 @@ export function Footer() {
 
         <hr className="border-neutral-100" />
 
-        {/* Row 2: legal links + copyright */}
-        <div className="flex flex-col items-center gap-4 text-sm text-muted-foreground sm:flex-row sm:justify-between sm:gap-4">
+        {/* Row 2: legal links (prominent — foreground/16px per Figma node 182:3933,
+            Body/B1 Regular #363744) + recessed copyright (Body/B2, muted). */}
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between sm:gap-4">
           <nav
             aria-label="Enlaces legales"
-            className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
+            className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-base"
           >
             {LEGAL_LINKS.map((l) => (
-              <Link key={l.href} href={l.href} className={linkClass}>
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`${linkClass} text-foreground hover:underline`}
+              >
                 {l.label}
               </Link>
             ))}
           </nav>
 
-          <p className="text-xs">
+          <p className="text-xs text-muted-foreground">
             © 2026 Alta Vibración. Todos los derechos reservados.
           </p>
         </div>
