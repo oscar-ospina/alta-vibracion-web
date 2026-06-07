@@ -35,6 +35,32 @@
     var(--color-orange-500) 55%,
     var(--color-orange-400) 100%
   );
+  --grad-text: linear-gradient(270deg, #f06b06 0%, #fac938 100%); /* Figma ts1 — hero "esencia" accent */
+}
+
+/* ── Gradient text (brand token + consumer fallback) ─────────────────────────
+ * `.text-gradient-brand` clips --grad-text to the glyphs (story #37, Figma ts1).
+ * Tailwind v4 DOES emit the -webkit-background-clip alias for bg-clip-text
+ * (verified in the built CSS), so the gradient paints across the modern browser
+ * set — but `text-transparent` applies unconditionally, so a browser supporting
+ * NEITHER background-clip:text prefix (~pre-2016) would paint the word invisible.
+ * AC #37 explicitly required a solid-color fallback; this rule supplies it: the
+ * word stays a visible, AA-legible brand orange (--color-orange-500 ≈ 4.7:1 on the
+ * #24242d hero) UNLESS background-clip:text is actually supported, in which case it
+ * flips to transparent so the gradient shows through (avoids the "transparent always
+ * wins" trap). Unlayered so it beats @layer utilities. Same compensation shape as
+ * the [data-slot=button] focus ring below. */
+.text-gradient-brand {
+  color: var(--color-orange-500);
+  background-image: var(--grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .text-gradient-brand {
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
 }
 
 /* ── @saas/ui Button focus ring (consumer compensation) ──────────────────────
