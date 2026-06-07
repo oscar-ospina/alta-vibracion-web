@@ -31,6 +31,15 @@ function formatPhoneDisplay(digits: string): string {
 
 export const CONTACT_PHONE_DISPLAY = formatPhoneDisplay(WHATSAPP_NUMBER);
 
+/**
+ * Public social profiles — rendered in the footer "Síguenos" row (story #36).
+ * Only the networks the practice actually maintains (today: Instagram only; the
+ * Figma design also shows TikTok — add here when it launches).
+ */
+export const SOCIAL = {
+  instagram: "https://www.instagram.com/lili.altavibracion",
+} as const;
+
 /** Default prefilled message for the persistent top-bar / generic booking intent. */
 export const BOOKING_MESSAGE =
   "Hola Alta Vibración, quiero agendar una consulta de numerología.";
