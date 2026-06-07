@@ -2,15 +2,21 @@
  * Central site config — contact channels + route map for Alta Vibración.
  *
  * Code & routing are in English; user-facing copy is Spanish (es-CO).
- * The WhatsApp business number is an open question (epic oscar-ospina/saas-planner#16):
- * it comes from NEXT_PUBLIC_WHATSAPP_NUMBER in production, with a clearly-marked
- * placeholder for local/dev so the CTA wiring stays testable. Reused by the hero
- * FAB (#23) and the contact page (#26).
+ * Contact channels are inlined (public, single-brand site); NEXT_PUBLIC_WHATSAPP_NUMBER
+ * can override the number per environment. Reused by the hero FAB (#23) and the
+ * contact page (#26).
  */
 
 // wa.me format: digits only, country code first, no '+'/spaces.
-// TODO(saas-planner#16): replace placeholder with the real AV business number.
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "573000000000";
+// Real AV business line (resolves epic oscar-ospina/saas-planner#16).
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "573217413770";
+
+/** Public contact details — single-brand marketing site, safe to inline. */
+export const CONTACT = {
+  whatsappNumber: WHATSAPP_NUMBER,
+  email: "lp.tobon.miranda@gmail.com",
+  phone: "+573217413770", // tel: format (with +); same line as WhatsApp
+} as const;
 
 /** Default prefilled message for the persistent top-bar / generic booking intent. */
 export const BOOKING_MESSAGE =
