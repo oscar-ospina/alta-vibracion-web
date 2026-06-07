@@ -1,0 +1,55 @@
+/**
+ * Alta Vibración — brand theme layer (THIN; see ADR oscar-ospina/saas-planner#18).
+ *
+ * Inherits @saas/ui's Figma-derived tokens wholesale and adds ONLY brand
+ * specifics the DS doesn't (and shouldn't) own: brand-named color aliases,
+ * heading defaults, and the brand gradients. Never redefines a DS hex.
+ * Light-only — the DS ships no dark palette (deferred theming epic).
+ * Story oscar-ospina/saas-planner#20.
+ */
+
+/* ── Brand color vocabulary ──────────────────────────────────────────────────
+ * ALIASES over @saas/ui tokens (reference, never redefine the hex). Tailwind v4
+ * turns each into utilities: bg-brand / text-brand-ink / ring-brand-accent, …
+ *
+ * ⚠️ AA: the brand hue (#f37d3e, orange-400) is only 2.68:1 on white — FILL ONLY,
+ * paired with a dark foreground. NEVER as text. For brand-colored text/links use
+ * --color-brand-ink (orange-700, 5.84:1 on bg). Violet-500 is likewise fill-only.
+ */
+@theme {
+  --color-brand: var(--color-orange-400); /* #f37d3e — brand hue (fills/accents) */
+  --color-brand-accent: var(--color-violet-500); /* #7f5af8 — secondary hue (fills/accents) */
+  --color-brand-ink: var(--color-orange-700); /* #bb3313 — AA-legible brand text/links */
+}
+
+/* ── Brand gradients ─────────────────────────────────────────────────────────
+ * NOT in @saas/ui — brand-layer owned (the logo SVGs bake their own copies; the
+ * hero #23 will consume these vars). The swoosh maps exactly onto the DS ramp;
+ * grad-primary's 9% stop (#f09942) is a logo-only shade with no ramp slot.
+ */
+:root {
+  --grad-primary: linear-gradient(180deg, #f09942 9%, var(--color-orange-400) 81%);
+  --grad-swoosh: linear-gradient(
+    90deg,
+    var(--color-violet-500) 0%,
+    var(--color-orange-500) 55%,
+    var(--color-orange-400) 100%
+  );
+}
+
+/* ── Heading defaults ────────────────────────────────────────────────────────
+ * On ANY page, headings render in Archivo with the Figma -0.25px tracking
+ * (AC #1). In @layer base so per-element Tailwind utilities (font-*, tracking-*)
+ * still override.
+ */
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.25px;
+  }
+}

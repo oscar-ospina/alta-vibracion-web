@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@saas/ui/theme.css";
+@import "./brand.css"; /* Alta Vibración brand layer — tokens, headings, gradients */
 @source "../node_modules/@saas/ui";
 
 /*
