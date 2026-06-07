@@ -15,8 +15,21 @@ const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "573217413770
 export const CONTACT = {
   whatsappNumber: WHATSAPP_NUMBER,
   email: "lp.tobon.miranda@gmail.com",
-  phone: "+573217413770", // tel: format (with +); same line as WhatsApp
+  phone: `+${WHATSAPP_NUMBER}`, // tel: format (with +); same line as WhatsApp
 } as const;
+
+/**
+ * Human-readable form of the WhatsApp/phone line, DERIVED from the same canonical
+ * number as the wa.me/tel hrefs — so the displayed value can never drift from the
+ * link if NEXT_PUBLIC_WHATSAPP_NUMBER is overridden. Colombian mobile (57 + 10
+ * digits) renders as "+57 321 741 3770"; anything else falls back to "+<digits>".
+ */
+function formatPhoneDisplay(digits: string): string {
+  const m = digits.match(/^57(\d{3})(\d{3})(\d{4})$/);
+  return m ? `+57 ${m[1]} ${m[2]} ${m[3]}` : `+${digits}`;
+}
+
+export const CONTACT_PHONE_DISPLAY = formatPhoneDisplay(WHATSAPP_NUMBER);
 
 /** Default prefilled message for the persistent top-bar / generic booking intent. */
 export const BOOKING_MESSAGE =
