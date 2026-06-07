@@ -1,10 +1,17 @@
 import { Hero } from "@/components/sections/hero";
+import { WhyNumerology } from "@/components/sections/why-numerology";
+import { AboutLiliana } from "@/components/sections/about-liliana";
 
 /**
- * Home — the marketing landing. #23 lands the hero; the "¿Por qué Numerología?"
- * / "¿Quién es Liliana Tobón?" trust sections (#24) and the consultations grid
- * (#25) append below it next.
+ * Home — the marketing landing. Hero (#23) + trust sections (#24). The
+ * consultations grid (#25) appends below next.
  */
 export default function Home() {
-  return <Hero />;
+  return (
+    <>
+      <Hero />
+      <WhyNumerology />
+      <AboutLiliana />
+    </>
+  );
 }
