@@ -17,7 +17,8 @@ import { Card } from "@saas/ui";
 export function WhyNumerology() {
   return (
     <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-10">
-      <Card className="overflow-hidden rounded-[2rem] p-0">
+      {/* border-0: the Figma card has no stroke — let the bleed image meet the rounded edge cleanly. */}
+      <Card className="overflow-hidden rounded-[2rem] border-0 p-0">
         <div className="grid md:grid-cols-2">
           {/* Cosmic image panel — bleeds to the (rounded, clipped) card edge. The two
               brand line-art faces are layered over it per Figma (asset2 large upper-left,
@@ -49,6 +50,8 @@ export function WhyNumerology() {
 
           {/* Content */}
           <div className="flex flex-col justify-center gap-5 p-8 sm:p-10">
+            {/* Figma flanks the label with "✨"; we use monochrome lucide Sparkles instead
+                (brand-consistent + inherits the AA brand-ink color rather than emoji color). */}
             <span className="inline-flex items-center gap-2 text-base font-semibold text-brand-ink sm:text-lg">
               <Sparkles className="size-4 shrink-0" aria-hidden />
               <span>No es casualidad. Es vibración.</span>
