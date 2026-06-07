@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Política de Privacidad" };
+export const metadata: Metadata = {
+  title: "Política de Privacidad",
+  description:
+    "Cómo Alta Vibración trata y protege tus datos personales conforme a la Ley 1581 de 2012 (Habeas Data) en Colombia.",
+};
 
 export default function PrivacyPage() {
   return (

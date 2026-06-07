@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Términos de Uso" };
+export const metadata: Metadata = {
+  title: "Términos de Uso",
+  description:
+    "Términos y condiciones de uso del sitio de Alta Vibración, la práctica de numerología de Liliana Tobón.",
+};
 
 export default function TermsPage() {
   return (

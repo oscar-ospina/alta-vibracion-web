@@ -42,7 +42,10 @@ export function Logo({ variant = "horizontal", href = "/", className }: LogoProp
   if (href === null) return img;
 
   return (
-    <Link href={href} className="inline-flex shrink-0">
+    <Link
+      href={href}
+      className="inline-flex shrink-0 rounded-md focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring"
+    >
       {img}
     </Link>
   );

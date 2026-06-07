@@ -27,6 +27,15 @@ export function whatsappUrl(message: string = BOOKING_MESSAGE): string {
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
 
+/**
+ * Canonical production origin — drives metadataBase, OpenGraph, sitemap & robots.
+ * Override per environment with NEXT_PUBLIC_SITE_URL (set in Vercel to the real
+ * subdomain on resuelv.com). The default is the planned AV subdomain, so OG/sitemap
+ * URLs are correct without a code change once the final host is wired.
+ */
+export const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://altavibracion.resuelv.com";
+
 /** App route map — English segments; Spanish labels live at the call site. */
 export const ROUTES = {
   home: "/",

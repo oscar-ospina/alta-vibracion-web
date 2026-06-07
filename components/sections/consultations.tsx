@@ -1,7 +1,7 @@
 import { Sparkles } from "lucide-react";
-import { Badge, Button, Card, CardContent } from "@saas/ui";
+import { Badge, Card, CardContent } from "@saas/ui";
 import { CONSULTATIONS, formatCOP } from "@/lib/consultations";
-import { whatsappUrl } from "@/lib/site";
+import { BookingButton } from "@/components/brand/booking-button";
 
 /**
  * "Aplicaciones Prácticas" consultations grid (story oscar-ospina/saas-planner#25).
@@ -47,18 +47,16 @@ export function Consultations() {
                   <span className="font-semibold text-foreground">
                     {formatCOP(c.price)}
                   </span>
-                  <Button size="sm" asChild className="w-full">
-                    <a
-                      href={whatsappUrl(
-                        `Hola Alta Vibración, quiero agendar la consulta "${c.name}".`,
-                      )}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Agendar ${c.name} por WhatsApp`}
-                    >
-                      Agendar
-                    </a>
-                  </Button>
+                  <BookingButton
+                    source="consultation"
+                    size="sm"
+                    className="w-full"
+                    message={`Hola Alta Vibración, quiero agendar la consulta "${c.name}".`}
+                    eventProps={{ consultation: c.name }}
+                    aria-label={`Agendar ${c.name} por WhatsApp`}
+                  >
+                    Agendar
+                  </BookingButton>
                 </div>
               </CardContent>
             </Card>
