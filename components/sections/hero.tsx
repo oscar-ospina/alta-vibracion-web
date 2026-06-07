@@ -30,25 +30,11 @@ export function Hero() {
       <div className="absolute inset-0 bg-neutral-950/75 lg:hidden" />
       <div className="absolute inset-0 hidden bg-gradient-to-r from-neutral-950/95 via-neutral-950/80 to-neutral-950/30 lg:block" />
 
-      {/* Brand line-art decoration (#37): right side, above the scrim and behind the
-          text (which stays in the left half at lg+). The warm glow is baked into the
-          SVG's own drop-shadow filter. Desktop-only — keeps the uniform-scrim mobile
-          layout clean. Decorative → aria-hidden + pointer-events-none. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/hero-decoration.svg"
-        alt=""
-        aria-hidden
-        className="pointer-events-none absolute right-0 top-1/2 hidden h-[62%] max-h-[440px] w-auto -translate-y-1/2 select-none opacity-95 lg:block xl:h-[72%] xl:max-h-[520px]"
-      />
-
-      <div className="relative mx-auto max-w-6xl px-4 py-24 sm:px-6 sm:py-28 lg:px-10 lg:py-32">
+      <div className="relative mx-auto max-w-6xl px-4 py-24 sm:px-6 sm:py-28 lg:flex lg:items-center lg:px-10 lg:py-32">
         <div className="max-w-xl">
           <h1 className="text-4xl font-bold leading-[1.08] tracking-[-0.0045em] text-white sm:text-5xl lg:text-[56px]">
             Conecta con tu{" "}
-            <span className="bg-[linear-gradient(270deg,#f06b06_0%,#fac938_100%)] bg-clip-text text-transparent">
-              esencia
-            </span>{" "}
+            <span className="text-gradient-brand">esencia</span>{" "}
             a través de los números
           </h1>
           <p className="mt-5 text-lg leading-relaxed text-white/85">
@@ -63,6 +49,21 @@ export function Hero() {
             </BookingButton>
           </div>
         </div>
+
+        {/* Brand line-art decoration (#37): the gold botanical line-art as an IN-FLOW
+            right column at lg+ (ml-auto pushes it to the edge) — side-by-side with the
+            text exactly like Figma, so it can never sit behind the H1/subhead. (The
+            earlier absolute version bled left into the text column at the 1024–1400px
+            band, putting gold strokes behind white glyphs.) The warm glow is baked into
+            the SVG's own drop-shadow filter. Desktop-only — mobile keeps the uniform
+            scrim. Decorative → aria-hidden + pointer-events-none. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/hero-decoration.svg"
+          alt=""
+          aria-hidden
+          className="pointer-events-none ml-auto hidden h-auto w-[36%] max-w-[480px] select-none opacity-95 lg:block"
+        />
       </div>
     </section>
   );
