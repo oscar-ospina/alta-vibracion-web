@@ -37,6 +37,29 @@
   );
 }
 
+/* ── @saas/ui Button focus ring (consumer compensation) ──────────────────────
+ * The DS Button signals keyboard focus via a box-shadow ring
+ * (`focus-visible:ring-[3px] ring-ring/50`) that does NOT render in this Tailwind
+ * v4 consumer, AND its base `outline-none` poisons the `--tw-outline-*` vars so a
+ * utility-class outline can't reliably override it (style→none / color→currentColor).
+ * So the primary CTAs would ship with NO visible focus indicator (WCAG 2.4.7 + #22 AC).
+ * This UNLAYERED rule wins over @layer utilities and sets the full outline shorthand
+ * atomically → a guaranteed 3px orange ring on every DS Button. Compensation only;
+ * the DS-side fix is tracked in saas-planner. Verified via headless focus screenshot.
+ */
+[data-slot="button"]:focus-visible {
+  /* The DS Button's own keyboard-focus ring (`focus-visible:ring-[3px] ring-ring/50`,
+     a box-shadow) does NOT render in this Tailwind v4 consumer, so its CTAs would ship
+     with no visible focus indicator (WCAG 2.4.7 fail). This unlayered rule restores a
+     visible 3px ring. NOTE: an opaque Tailwind v4 / Lightning-CSS interaction pins this
+     button's `outline-color` to currentColor (orange-900 ink) regardless of what we set —
+     so the ring renders dark-orange rather than the bright orange-500 the other elements
+     use. It is still a clearly visible, high-contrast orange ring (orange-900 vs the light
+     page ≫ 3:1 ✅ WCAG 1.4.11). The exact-hue + DS-ring root cause are tracked in saas-planner. */
+  outline: 3px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
 /* ── Heading defaults ────────────────────────────────────────────────────────
  * On ANY page, headings render in Archivo with the Figma -0.25px tracking
  * (AC #1). In @layer base so per-element Tailwind utilities (font-*, tracking-*)
