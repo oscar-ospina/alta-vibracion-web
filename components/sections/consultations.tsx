@@ -1,12 +1,13 @@
 import { Sparkles } from "lucide-react";
 import { Badge, Card, CardContent } from "@saas/ui";
 import { CONSULTATIONS, formatCOP } from "@/lib/consultations";
-import { BookingButton } from "@/components/brand/booking-button";
+import { AgendaCta } from "@/components/brand/agenda-cta";
 
 /**
  * "Aplicaciones Prácticas" consultations grid (story oscar-ospina/saas-planner#25).
- * Data-driven from CONSULTATIONS; each card's "Agendar" opens WhatsApp with a
- * message naming that consultation (real in-app Agenda is deferred). Server component.
+ * Data-driven from CONSULTATIONS; each card's "Agendar" opens the in-app /agenda
+ * flow with that consultation preselected (story #45 — WhatsApp stays available
+ * via the top bar, FAB and a fallback link in /agenda). Server component.
  */
 export function Consultations() {
   return (
@@ -47,16 +48,16 @@ export function Consultations() {
                   <span className="font-semibold text-foreground">
                     {formatCOP(c.price)}
                   </span>
-                  <BookingButton
+                  <AgendaCta
                     source="consultation"
                     size="sm"
                     className="w-full"
-                    message={`Hola Alta Vibración, quiero agendar la consulta "${c.name}".`}
+                    citaId={c.id}
                     eventProps={{ consultation: c.name }}
-                    aria-label={`Agendar ${c.name} por WhatsApp`}
+                    aria-label={`Agendar ${c.name}`}
                   >
                     Agendar
-                  </BookingButton>
+                  </AgendaCta>
                 </div>
               </CardContent>
             </Card>
