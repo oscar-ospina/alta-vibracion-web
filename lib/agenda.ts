@@ -33,12 +33,12 @@ export const SLOT_TIMES = [
 export type SlotTime = (typeof SLOT_TIMES)[number];
 
 /** Earliest bookable day = tomorrow (Bogotá) — same-day requests go to WhatsApp. */
-export const LEAD_DAYS = 1;
+const LEAD_DAYS = 1;
 /** Booking horizon — 4 weeks out. */
-export const HORIZON_DAYS = 28;
+const HORIZON_DAYS = 28;
 /** Simulated-busy range per date: blocked slot count is uniform in [MIN, MAX]. */
-export const MIN_BLOCKED = 1;
-export const MAX_BLOCKED = 3;
+const MIN_BLOCKED = 1;
+const MAX_BLOCKED = 3;
 
 const BOGOTA = "America/Bogota";
 
@@ -58,14 +58,14 @@ function toISO(date: Date): ISODate {
   return date.toISOString().slice(0, 10);
 }
 
-export function addDays(iso: ISODate, days: number): ISODate {
+function addDays(iso: ISODate, days: number): ISODate {
   const date = toUTCDate(iso);
   date.setUTCDate(date.getUTCDate() + days);
   return toISO(date);
 }
 
 /** Liliana attends Monday–Friday. */
-export function isWorkingDay(iso: ISODate): boolean {
+function isWorkingDay(iso: ISODate): boolean {
   const day = toUTCDate(iso).getUTCDay();
   return day >= 1 && day <= 5;
 }
@@ -77,8 +77,16 @@ export function firstBookableDate(today: ISODate): ISODate {
   return date;
 }
 
+/**
+ * Last selectable date: the horizon, clamped BACK to a working day — otherwise
+ * a horizon ending on a weekend at the start of a month makes "Mes siguiente"
+ * open a grid with zero selectable days (e.g. today 2026-07-04 → horizon Sat
+ * 2026-08-01, an all-disabled August).
+ */
 export function lastBookableDate(today: ISODate): ISODate {
-  return addDays(today, HORIZON_DAYS);
+  let date = addDays(today, HORIZON_DAYS);
+  while (!isWorkingDay(date)) date = addDays(date, -1);
+  return date;
 }
 
 /** ISO strings compare lexicographically, so date bounds are plain comparisons. */
@@ -175,15 +183,14 @@ export function pickBlockedSlots(rng: () => number = Math.random): SlotTime[] {
 /** Prefilled WhatsApp text — the booking "payload" of this MVP (es-CO copy). */
 export function buildBookingMessage(args: {
   name: string;
-  citaName: string;
+  consultationName: string;
   modality: Modality;
   date: ISODate;
   time: SlotTime;
 }): string {
-  const modality = args.modality === "presencial" ? "presencial" : "virtual";
   return (
-    `Hola, soy ${args.name}. Quiero agendar la consulta «${args.citaName}» ` +
-    `en modalidad ${modality} el ${formatLongDate(args.date)} a las ` +
+    `Hola, soy ${args.name}. Quiero agendar la consulta «${args.consultationName}» ` +
+    `en modalidad ${args.modality} el ${formatLongDate(args.date)} a las ` +
     `${formatSlotLabel(args.time)} (hora de Colombia). ¿Me confirmas la disponibilidad?`
   );
 }

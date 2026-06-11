@@ -4,7 +4,7 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { track } from "@vercel/analytics";
-import { BadgeCheck, CheckCircle2, MapPin, MessageCircle } from "lucide-react";
+import { BadgeCheck, MapPin, MessageCircle } from "lucide-react";
 import {
   Badge,
   Button,
@@ -43,8 +43,8 @@ import {
   todayInBogota,
 } from "@/lib/agenda";
 import {
-  type AgendaBooking,
   type AgendaState,
+  type BookedSlot,
   addBooking,
   ensureBlockedSlots,
   findBooking,
@@ -67,7 +67,14 @@ import { MonthCalendar } from "@/components/agenda/month-calendar";
 const FOCUS_RING =
   "focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-const EMPTY_AGENDA: AgendaState = { blocked: {}, bookings: [] };
+/** Session-only summary for the confirmation panel — never persisted (PII). */
+type ConfirmedBooking = {
+  consultationName: string;
+  modality: Modality;
+  date: ISODate;
+  time: SlotTime;
+  name: string;
+};
 
 // Hydration gate without setState-in-effect: the server snapshot is false, the
 // client snapshot true — React re-renders once right after hydration.
@@ -111,7 +118,7 @@ export function AgendaSkeleton() {
 
 export function AgendaFlow() {
   const searchParams = useSearchParams();
-  const citaParam = searchParams.get("cita");
+  const consultationParam = searchParams.get("consultation");
   const hydrated = useIsHydrated();
 
   // Bogotá "today" is clock-dependent → only computed client-side, post-gate.
@@ -120,10 +127,10 @@ export function AgendaFlow() {
     [hydrated],
   );
 
-  // Preselect the consultation from /agenda?cita=<id> (the grid's CTAs).
-  const [cita, setCita] = useState<Consultation>(
+  // Preselect from /agenda?consultation=<id> (the grid's CTAs).
+  const [consultation, setConsultation] = useState<Consultation>(
     () =>
-      CONSULTATIONS.find((c) => String(c.id) === citaParam) ??
+      CONSULTATIONS.find((c) => String(c.id) === consultationParam) ??
       CONSULTATIONS[0],
   );
   const [modality, setModality] = useState<Modality>("presencial");
@@ -137,14 +144,15 @@ export function AgendaFlow() {
   const [selectedDate, setSelectedDate] = useState<ISODate | null>(null);
   const [selectedTime, setSelectedTime] = useState<SlotTime | null>(null);
   const [name, setName] = useState("");
-  const [confirmed, setConfirmed] = useState<AgendaBooking | null>(null);
+  const [confirmed, setConfirmed] = useState<ConfirmedBooking | null>(null);
 
+  // The early return guarantees `hydrated` below it — `today` is derived from it.
   if (!today) return <AgendaSkeleton />;
 
   const cursor = cursorOverride ?? monthCursorFor(firstBookableDate(today));
   // loadAgendaState() reads localStorage once and returns the stable module
   // cache afterwards, so deriving it during render is cheap and loop-safe.
-  const agenda = agendaOverride ?? (hydrated ? loadAgendaState() : EMPTY_AGENDA);
+  const agenda = agendaOverride ?? loadAgendaState();
 
   const minCursor = monthCursorFor(firstBookableDate(today));
   const maxCursor = monthCursorFor(lastBookableDate(today));
@@ -158,7 +166,7 @@ export function AgendaFlow() {
     ? whatsappUrl(
         buildBookingMessage({
           name: trimmedName,
-          citaName: cita.name,
+          consultationName: consultation.name,
           modality,
           date: selectedDate,
           time: selectedTime,
@@ -176,20 +184,22 @@ export function AgendaFlow() {
 
   function handleConfirm() {
     if (!ready || !selectedDate || !selectedTime) return;
-    const booking: AgendaBooking = {
+    const slot: BookedSlot = {
       date: selectedDate,
       time: selectedTime,
-      citaId: cita.id,
-      citaName: cita.name,
-      modality,
-      name: trimmedName,
       createdAt: new Date().toISOString(),
     };
-    setAgendaOverride(addBooking(booking));
-    setConfirmed(booking);
+    setAgendaOverride(addBooking(slot));
+    setConfirmed({
+      consultationName: consultation.name,
+      modality,
+      date: selectedDate,
+      time: selectedTime,
+      name: trimmedName,
+    });
     track("book_consultation", {
       source: "agenda",
-      consultation: cita.name,
+      consultation: consultation.name,
       modality,
     });
   }
@@ -198,7 +208,7 @@ export function AgendaFlow() {
     const reopenHref = whatsappUrl(
       buildBookingMessage({
         name: confirmed.name,
-        citaName: confirmed.citaName,
+        consultationName: confirmed.consultationName,
         modality: confirmed.modality,
         date: confirmed.date,
         time: confirmed.time,
@@ -207,21 +217,25 @@ export function AgendaFlow() {
     return (
       <Card className="mt-8 max-w-2xl">
         <CardContent className="space-y-4">
+          {/* Deliberately NOT a success state: the request only exists once the
+              visitor presses send inside WhatsApp — which we can't observe. The
+              panel frames the send as the pending last step (review finding). */}
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="size-8 text-[#006644]" aria-hidden />
+            <MessageCircle className="size-8 text-brand-ink" aria-hidden />
             <h2 className="text-xl font-bold text-foreground">
-              Tu solicitud va en camino
+              Último paso: envía el mensaje en WhatsApp
             </h2>
           </div>
           <p className="text-muted-foreground">
-            Abrimos WhatsApp con los detalles de tu cita. Envía el mensaje y
-            Lili revisará su disponibilidad para confirmarte por ese mismo
-            chat. El pago también se coordina por WhatsApp.
+            Abrimos WhatsApp en otra pestaña con los detalles de tu solicitud
+            — solo falta que <strong>envíes el mensaje</strong>. Lili revisará
+            su disponibilidad y te confirmará por ese mismo chat. El pago
+            también se coordina por WhatsApp.
           </p>
           <dl className="space-y-1 rounded-xl bg-orange-50 p-4 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="font-semibold text-foreground">Consulta</dt>
-              <dd className="text-right">{confirmed.citaName}</dd>
+              <dd className="text-right">{confirmed.consultationName}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="font-semibold text-foreground">Modalidad</dt>
@@ -236,30 +250,26 @@ export function AgendaFlow() {
               <dd>{formatSlotLabel(confirmed.time)} (hora de Colombia)</dd>
             </div>
           </dl>
-          <p className="text-sm text-muted-foreground">
-            ¿No se abrió WhatsApp?{" "}
-            <a
-              href={reopenHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(
-                "rounded-md font-semibold text-brand-ink underline underline-offset-2",
-                FOCUS_RING,
-              )}
+          <div className="flex flex-wrap gap-3">
+            <Button asChild>
+              <a href={reopenHref} target="_blank" rel="noopener noreferrer">
+                <MessageCircle className="size-4" aria-hidden />
+                Abrir WhatsApp de nuevo
+              </a>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConfirmed(null);
+                setSelectedTime(null);
+              }}
             >
-              Ábrelo aquí
-            </a>
-            . Para cambios o cancelaciones, escríbenos por el mismo chat.
+              Agendar otra consulta
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Para cambios o cancelaciones, escríbenos por el mismo chat.
           </p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setConfirmed(null);
-              setSelectedTime(null);
-            }}
-          >
-            Agendar otra consulta
-          </Button>
         </CardContent>
       </Card>
     );
@@ -295,20 +305,20 @@ export function AgendaFlow() {
 
             <div>
               <Label
-                id="cita-label"
+                id="consultation-label"
                 className="text-xs font-bold uppercase tracking-wider text-violet-700"
               >
                 Consulta
               </Label>
               <Select
-                value={String(cita.id)}
+                value={String(consultation.id)}
                 onValueChange={(v) => {
                   const found = CONSULTATIONS.find((c) => String(c.id) === v);
-                  if (found) setCita(found);
+                  if (found) setConsultation(found);
                 }}
               >
                 <SelectTrigger
-                  aria-labelledby="cita-label"
+                  aria-labelledby="consultation-label"
                   className="mt-2 w-full"
                 >
                   <SelectValue />
@@ -322,19 +332,23 @@ export function AgendaFlow() {
                 </SelectContent>
               </Select>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                {cita.description}
+                {consultation.description}
               </p>
             </div>
 
+            {/* Kit parity note: the kit draws 22px orange circle-dot icons over
+                a bare label (no input). We keep native radios for a11y and
+                approximate the look — stacked options, larger brand-accent
+                control, 16px labels (accepted deviation, like brand-ink). */}
             <fieldset>
               <legend className="text-sm font-bold text-foreground">
                 Modalidad de la sesión
               </legend>
-              <div className="mt-2 flex gap-5">
+              <div className="mt-2 flex flex-col gap-2">
                 {MODALITIES.map((m) => (
                   <label
                     key={m.value}
-                    className="flex cursor-pointer items-center gap-2 text-sm text-foreground"
+                    className="flex cursor-pointer items-center gap-2.5 text-base text-foreground"
                   >
                     <input
                       type="radio"
@@ -342,7 +356,7 @@ export function AgendaFlow() {
                       value={m.value}
                       checked={modality === m.value}
                       onChange={() => setModality(m.value)}
-                      className={cn("size-4 accent-orange-700", FOCUS_RING)}
+                      className={cn("size-5 accent-orange-700", FOCUS_RING)}
                     />
                     {m.label}
                   </label>
@@ -447,7 +461,7 @@ export function AgendaFlow() {
               Precio
             </p>
             <p className="font-display text-2xl font-semibold text-foreground">
-              {formatCOP(cita.price)}
+              {formatCOP(consultation.price)}
             </p>
             <p className="text-xs text-muted-foreground">
               El pago se coordina por WhatsApp.
@@ -470,7 +484,9 @@ export function AgendaFlow() {
           <div className="flex flex-col items-start gap-2">
             <p className="text-sm text-muted-foreground" aria-live="polite">
               {selectedDate && selectedTime
-                ? `${formatLongDate(selectedDate)} · ${formatSlotLabel(selectedTime)}`
+                ? `${formatLongDate(selectedDate)} · ${formatSlotLabel(selectedTime)}${
+                    ready ? "" : " — cuéntanos tu nombre para continuar"
+                  }`
                 : "Elige fecha, hora y cuéntanos tu nombre."}
             </p>
             {ready ? (

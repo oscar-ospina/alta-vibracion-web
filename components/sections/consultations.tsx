@@ -52,7 +52,7 @@ export function Consultations() {
                     source="consultation"
                     size="sm"
                     className="w-full"
-                    citaId={c.id}
+                    consultationId={c.id}
                     eventProps={{ consultation: c.name }}
                     aria-label={`Agendar ${c.name}`}
                   >

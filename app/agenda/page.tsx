@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 /**
  * /agenda — the in-app booking flow (story oscar-ospina/saas-planner#45, local
  * MVP: simulated availability + WhatsApp handoff; no backend). The interactive
- * flow is a client island behind Suspense (it reads ?cita= via useSearchParams);
+ * flow is a client island behind Suspense (it reads ?consultation= via useSearchParams);
  * the heading prerenders so the page has server-rendered content.
  */
 export default function AgendaPage() {
