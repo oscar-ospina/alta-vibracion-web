@@ -1,10 +1,11 @@
 import Image from "next/image";
 import { Calendar } from "lucide-react";
-import { BookingButton } from "@/components/brand/booking-button";
+import { AgendaCta } from "@/components/brand/agenda-cta";
 
 /**
  * Home hero (stories oscar-ospina/saas-planner#23 / #37): cosmic backdrop + dark scrim,
- * the gradient-accented H1, subhead, and the primary "Agenda tu cita" CTA → WhatsApp.
+ * the gradient-accented H1, subhead, and the primary "Agenda tu cita" CTA → the in-app
+ * /agenda flow (story #45; WhatsApp stays available via the top bar + FAB).
  *
  * Fidelity to Figma (hero section 182:3849): "esencia" carries the design text gradient
  * (`ts1` = linear 270° #f06b06→#fac938); the H1 is Archivo 56px / 108% line-height /
@@ -43,10 +44,10 @@ export function Hero() {
             propósito.
           </p>
           <div className="mt-8">
-            <BookingButton source="hero" size="lg">
+            <AgendaCta source="hero" size="lg">
               <Calendar className="size-5" aria-hidden />
               Agenda tu cita
-            </BookingButton>
+            </AgendaCta>
           </div>
         </div>
 

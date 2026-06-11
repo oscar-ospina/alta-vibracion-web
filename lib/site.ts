@@ -61,6 +61,7 @@ export const SITE_URL =
 /** App route map — English segments; Spanish labels live at the call site. */
 export const ROUTES = {
   home: "/",
+  agenda: "/agenda",
   contact: "/contact",
   terms: "/terms",
   privacy: "/privacy",
