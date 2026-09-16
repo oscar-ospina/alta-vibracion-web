@@ -1,57 +1,96 @@
 @AGENTS.md
 
-# alta-vibracion-web — working notes for Claude
+# CLAUDE.md
 
-The **Alta Vibración** consumer web app (the product surface for Liliana Tobón's numerology practice, ES-CO). It *imports* the brand-agnostic `@saas/ui` design system and adds the brand layer here.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Planning lives elsewhere
+The **Alta Vibración** consumer web app: the marketing site + booking flow for
+Liliana Tobón's numerology practice (Spanish, Colombia). It imports the
+brand-agnostic `@saas/ui` design system and adds the brand layer here.
 
-Stories, epics, ADRs, and the board are in **[`saas-planner`](https://github.com/oscar-ospina/saas-planner)** (GitHub Issues/Projects v2, `gh` CLI). This repo is **code only**. Reference the planner issue in commits/PRs:
+## Commands
 
+```bash
+npm run dev            # http://localhost:3000
+npm run build          # next build — marketing pages prerender statically
+npm run start          # serve the production build
+npm run lint           # eslint (flat config)
+npm run typecheck      # tsc --noEmit
+npm run smoke:calendar # live Google Calendar check; skips without credentials
 ```
-feat: <summary> (oscar-ospina/saas-planner#<n>)
-# PR body: Closes oscar-ospina/saas-planner#<n>
-```
 
-Epics so far (both closed): **[#16](https://github.com/oscar-ospina/saas-planner/issues/16)** marketing landing MVP (stories #17–#26) and **[#35](https://github.com/oscar-ospina/saas-planner/issues/35)** landing visual fidelity to Figma (stories #36–#39 — hero gradient/decoration, why-numerology bleed card + line-art, about-liliana accordion + chips). **▶ Active next: [#31](https://github.com/oscar-ospina/saas-planner/issues/31) booking & checkout** — Phase 1 = booking-only via **Google Calendar**, backend = Server Actions/Route Handlers **in this repo** (no `api/` sibling yet). Spikes #32/#33 are **resolved with ADRs**; the **Agenda Phase-1 stories #40–#44 are filed (Todo)** — see "Booking (epic #31)" below for the build order + decisions. See [README → status](README.md) for shipped features + the pre-launch checklist.
+Node ≥ 20.9 (Next 16). CI runs lint + typecheck + build on push/PR. There is no
+test suite. **Verify visual/CSS changes against a fresh build**
+(`rm -rf .next && npm run dev`, or `npm run build && npm run start`): Turbopack dev
+HMR can serve stale CSS for new arbitrary utilities. Details in
+`docs/frontend-notes.md`.
 
-## Booking (epic #31, Phase 1)
+## Planning
 
-**▶ MVP pivot (owner decision 2026-06-10, story [#45](https://github.com/oscar-ospina/saas-planner/issues/45)):** the shipped Agenda is **local-only — no backend, no Google Calendar**. `/agenda` simulates availability client-side (1–3 random slots per viewed date marked "Reservado", persisted in `localStorage` key `av-agenda-v1`), the visitor's own booking persists too ("Tu cita"), and confirming opens **WhatsApp** with the full details (`track("book_consultation", { source: "agenda" })`). **Liliana syncs her real calendar manually.** Slot model in `lib/agenda.ts` (pure helpers, Bogotá-anchored dates), persistence in `lib/agenda-store.ts`, UI in `components/agenda/`. Hero + consultations-grid CTAs navigate to `/agenda` via `components/brand/agenda-cta.tsx` (`open_agenda` funnel event); WhatsApp direct stays on the top bar + FAB + a fallback link in `/agenda`.
+- `docs/DECISIONS.md` — decision index (W1–W11) + the map of legacy `saas-planner#N`
+  issue numbers. Check it before adding a dependency, service or pattern.
+- `docs/adr/` — long-form ADRs: app framework, brand layer, Google Calendar
+  integration, booking backend. The two booking ADRs are load-bearing before any
+  real-calendar work; the shipped Agenda is a local MVP by owner decision (W5).
+- `README.md` — shipped status and the pre-launch checklist. Work items are this
+  repo's GitHub issues; the `saas-planner` repo is retired.
 
-**Deferred real-integration track** (stories stay open in Todo): the two ADRs remain **load-bearing for that phase** ([Google Calendar](https://github.com/oscar-ospina/saas-planner/blob/main/docs/superpowers/specs/2026-06-07-av-google-calendar.md), [backend & data](https://github.com/oscar-ospina/saas-planner/blob/main/docs/superpowers/specs/2026-06-07-av-booking-backend.md)) — read them before resuming. Order: [#40](https://github.com/oscar-ospina/saas-planner/issues/40) GCal client live smoke-test (code already merged, owner-gated) → [#41](https://github.com/oscar-ospina/saas-planner/issues/41) availability/slots → [#43](https://github.com/oscar-ospina/saas-planner/issues/43) booking Server Action → [#44](https://github.com/oscar-ospina/saas-planner/issues/44) confirmation + `.ics`. ([#42](https://github.com/oscar-ospina/saas-planner/issues/42)'s UI is essentially covered by #45 — swapping the availability source is the remaining work.)
+## Architecture
 
-**#40 status (foundation):** `lib/calendar.ts` (auth, `listEvents`, `insertTimeBlock`, `deleteEvent`, `deterministicSlotId`, `toBogotaRFC3339`, `DuplicateEventError`/`CalendarConfigError`, backoff), the **setup runbook `docs/booking-setup.md`**, and the guarded **`npm run smoke:calendar`** are written. ⚠️ **The live smoke-test is still PENDING** — it needs a GCP service-account key + Liliana sharing her calendar (`Acl.insert`), which no one has provisioned yet. **Green CI does NOT mean #40 is verified** (the smoke-test is guarded/skipped without creds). Keep planner #40 OPEN until the live run passes; then #41–#44 can build on a verified integration. `googleapis` is Node-only — any route/action using `lib/calendar.ts` must `export const runtime = "nodejs"`.
+- **Next.js 16 App Router + TypeScript + Tailwind v4 + React 19**, static by
+  default. `app/` routes: Home, `/agenda`, legal pages; `components/{brand,layout,
+  sections,agenda}`; `lib/` for site config, catalog and helpers; `content/*.md`
+  for legal copy.
+- **Design-system wiring** (`docs/adr/2026-06-06-av-app-framework.md`):
+  `app/globals.css` does `@import "@saas/ui/theme.css"` + `@source
+  "../node_modules/@saas/ui"`; `app/brand.css` holds brand aliases, gradients and
+  heading/focus rules. `next/font` self-hosts Archivo + Open Sans as
+  `--font-archivo` / `--font-open-sans` — the names the DS theme expects, don't
+  rename them. Palette and type come from the DS; only brand specifics (logo SVGs,
+  copy, imagery, brand compositions) live here. Use DS tokens, never invent styles;
+  never fork brand values into the DS.
+- **Legal pages**: Markdown in `content/*.md` is read at build time by
+  `lib/legal.ts` and rendered by `components/sections/prose.tsx` with
+  `react-markdown` (raw HTML disabled). No runtime fs; pages stay prerendered.
+  The copy is a draft with `[POR CONFIRMAR: …]` placeholders and a `<DraftNotice>`
+  banner until legal review.
+- **Agenda (local MVP)**: `lib/agenda.ts` = pure slot helpers, Bogotá-anchored
+  dates; `lib/agenda-store.ts` = `localStorage` persistence (key `av-agenda-v1`,
+  simulated "Reservado" slots + the visitor's own booking); `components/agenda/` =
+  UI. Confirming opens WhatsApp; there is no backend.
+- **Google Calendar client** (`lib/calendar.ts`, `scripts/smoke-calendar.ts`,
+  runbook `docs/booking-setup.md`): merged but not live-verified. `googleapis` is
+  Node-only, so any route/action importing it must `export const runtime =
+  "nodejs"`. Env: `GOOGLE_SERVICE_ACCOUNT_KEY_B64`, `LILIANA_CALENDAR_ID`
+  (server-side only, never `NEXT_PUBLIC_`).
+- **Site URL**: `NEXT_PUBLIC_SITE_URL` (default `https://altavibracion.resuelv.com`)
+  drives `metadataBase`, sitemap and robots.
+- **Conversion tracking**: `track("book_consultation", { source })` fires from the
+  top bar `BookingButton`, the FAB (`whatsapp-fab.tsx`, source `"fab"`) and the
+  Agenda's WhatsApp handoff (source `"agenda"`); hero + consultations grid fire
+  `open_agenda` via `AgendaCta`. Route any new WhatsApp CTA through one of these.
 
-**Decisions to honor (don't re-litigate):**
-- **Auth:** Google Cloud **service account** + Liliana **shares her personal calendar** with it (`writer` ACL via **`Acl.insert`** — the Calendar UI share silently fails for non-human accounts). NO OAuth, NO domain-wide delegation (impossible on a personal gmail). SA JSON key **base64'd in one server-side env var** (never `NEXT_PUBLIC_`).
-- **Event = time-block, NO `attendees`** (a service account can't invite without DWD). Client is notified via the app's **WhatsApp/email + an `.ics`** (the `.ics` gives them a calendar entry without a Google invite). Target `calendarId` = Liliana's gmail, never `"primary"`.
-- **Scope** `calendar.events`; read availability via **`events.list`** (not `freebusy.query`). Times in **America/Bogotá (UTC-5, no DST)**; normalize slot starts to UTC.
-- **No DB** in Phase 1 — Google Calendar is the source of truth. Booking = a **Server Action** (`runtime="nodejs"`; it's a public POST → validate + re-check availability inside). Double-book guard = **deterministic slot-derived event id** (`base32hex(calendarId|slotStartUTC)`) → Google's `409 duplicate` = best-effort **idempotency, NOT a lock**. If real concurrency appears, add an **Upstash Redis `SET NX EX`** lock (a lock store, not a DB) — out of scope until volume warrants. Handle the **delete-then-rebook** id-reuse edge (salt or query-first).
-- `googleapis` is **Node-only** (not Edge). Open question for #44: proactive outbound client email/WhatsApp needs a transactional provider (Resend/etc.) — Phase-1 min = confirmation screen + `.ics` download.
+## Conventions
 
-## Gotchas worth knowing (from building the MVP)
-
-- **Legal copy is a BORRADOR.** `content/{terms,privacy}.md` still carry 14 `[POR CONFIRMAR: …]` placeholders + a `<DraftNotice>` banner; they must be filled and legally reviewed before public launch (Ley 1581 / Habeas Data). Contact page channels are real (from `lib/site.ts`).
-- **Legal content pipeline:** copy lives as Markdown in `content/*.md`, read at **build time** via `lib/legal.ts` (`readLegalDoc`, fs) and rendered with `react-markdown` in `components/sections/prose.tsx`. The pages stay statically prerendered, so there's no runtime fs; raw HTML is left disabled (the .md is trusted, in-repo).
-- **Production host is env-driven.** `NEXT_PUBLIC_SITE_URL` (default `https://altavibracion.resuelv.com`) drives `metadataBase`/sitemap/robots — set the real `resuelv.com` subdomain in Vercel at deploy; no code change needed.
-- **Focus ring:** `app/brand.css` has an unlayered `[data-slot="button"]:focus-visible` outline rule — a deliberate consumer compensation because the `@saas/ui` Button's own box-shadow focus ring does **not** render in this Tailwind v4 build (DS bug, [planner #30](https://github.com/oscar-ospina/saas-planner/issues/30)). Keep it until #30 lands. Other interactive elements use `focus-visible:outline-[3px] outline-ring` directly.
-- **Tailwind v4 quirks (learned in the fidelity epic #35):**
-  - `group-open:` is **not** a working variant in this consumer (it compiles to nothing). For a `<details>` accordion chevron, target the open ancestor directly: `[[open]_&]:rotate-90`. And v4 `rotate-*` sets the CSS **`rotate:`** property (not `transform`), so animate it with `transition-[rotate]`, **not** `transition-transform`.
-  - **Gradient text:** use the `.text-gradient-brand` class in `brand.css` (clips `--grad-text` to the glyphs + a `@supports` solid-color fallback) rather than inline `bg-clip-text text-transparent`. (Tailwind v4 *does* emit the `-webkit-background-clip` alias here, so the inline form isn't invisible on modern browsers — the fallback is for the pre-prefix tail + the AC; don't conflate this with the genuine #30 box-shadow non-render.)
-  - **Bleed-image cards:** the DS `Card` defaults to `rounded-2xl border py-6`; for a flush bleed image override with `rounded-[2rem] border-0 p-0` and pad the content cell instead. Useful exact matches: `bg-card` = `#ffffff`, `text-foreground` = `#363744` (the Figma card + body colors).
-- **⚠️ Turbopack dev HMR can serve STALE CSS** for class changes — a new arbitrary utility/variant may not appear until a full rebuild, so a `getComputedStyle` probe can falsely read "none". **Verify visual/CSS changes against a fresh build** (`rm -rf .next && npm run dev`, or `npm run build && npm run start`), not dev HMR. Verification harness used across #35: headless Playwright from the global npx cache — `NODE_PATH=~/.npm/_npx/<hash>/node_modules node script.js` against the server on a fixed port.
-- **CTA conversion tracking:** `track("book_consultation", { source })` fires from three places — the top bar (`BookingButton`), the FAB (`whatsapp-fab.tsx`, source `"fab"`), and the Agenda flow's WhatsApp handoff (source `"agenda"`). The hero + consultations grid fire the `open_agenda` funnel event instead (`AgendaCta`). Keep new WhatsApp CTAs on one of those paths so they're attributed.
-
-## Stack & conventions
-
-- **Next.js 16 App Router + TypeScript + Tailwind v4 + `@saas/ui`** (see [README](README.md)). Default branch `main`; CI = lint + typecheck + build on push/PR.
-- **Design system:** import primitives from `@saas/ui`; add only brand specifics (logo, copy, imagery, brand compositions) here — don't fork brand values into the DS. Wiring per [ADR #17](https://github.com/oscar-ospina/saas-planner/blob/main/docs/superpowers/specs/2026-06-06-av-app-framework.md): `app/globals.css` already does `@import "@saas/ui/theme.css"` + `@source "../node_modules/@saas/ui"`; `next/font` supplies `--font-archivo` / `--font-open-sans` (the variable names the DS theme expects — don't rename them).
-- **Light-only** — the DS has no dark palette (deferred).
-- **RSC:** `@saas/ui@0.2.0` ships no `"use client"`. Button/Badge/Card are server-safe; Radix-backed Dialog/Select/Toast need a `'use client'` boundary in the consumer.
-- **⚠️ ESLint is pinned to `^9`** — do **not** bump to 10. `eslint-config-next`'s bundled `eslint-plugin-import` / `eslint-plugin-jsx-a11y` cap at eslint `^9`; bumping breaks `npm run lint`.
-- Dual-use / brand-agnostic test for any change: the DS must stay re-themeable; brand-locked content belongs in this repo.
-
-## Brand (Alta Vibración)
-
-Orange `#f37d3e` + violet `#7f5af8`, Archivo + Open Sans, cosmic/warm, generous rounding. Tagline *"No es casualidad. Es vibración."* The palette + type come from `@saas/ui`'s shipped theme (AV is the DS's reference brand); brand-specific assets (logo SVGs) and copy live here. Design reference: the Claude Design bundle (clickable Home → Agenda → Pago UI kits + brand guide) — see the planner's `CLAUDE.md → Claude Design access`.
+- **ESLint stays on `^9`**: `eslint-config-next`'s bundled import/jsx-a11y plugins
+  cap at 9; bumping breaks `npm run lint`.
+- **Light-only**: the DS ships no dark palette.
+- **RSC**: `@saas/ui@0.2.0` ships no `"use client"`. Button/Badge/Card are
+  server-safe; Radix-backed Dialog/Select/Toast need a `'use client'` boundary here.
+- **Focus ring**: `app/brand.css` has an unlayered `[data-slot="button"]:focus-visible`
+  outline because the DS Button's box-shadow ring does not render in this Tailwind
+  v4 build (open DS bug, formerly planner #30). Keep it until the DS fixes it. Other
+  interactive elements use `focus-visible:outline-[3px] outline-ring`.
+- **Tailwind v4 quirks**: `group-open:` compiles to nothing — use `[[open]_&]:…`;
+  `rotate-*` sets the `rotate:` property, so use `transition-[rotate]`; gradient
+  text via `.text-gradient-brand`, not inline `bg-clip-text`; bleed-image cards
+  override the DS `Card` with `rounded-[2rem] border-0 p-0`. See
+  `docs/frontend-notes.md`.
+- **Product copy**: Spanish (Colombia), **tú**; currency `COP 150.000`;
+  consultations are "Citas" 1–4 with a theme; voice spiritual but grounded, never
+  salesy; sentence case. Tagline *"No es casualidad. Es vibración."*
+- Commits: conventional prefixes (`feat:`, `fix:`, `docs:`, `chore:`), imperative
+  summary; PRs `Closes #N` against this repo's issues.
+- Design reference: Claude Design workspace "AltaVibración Design System"
+  (project `6e43ffb4-24c4-4461-a4aa-81ee1ce59892`); the design-side twin is
+  documented in `saas-packages/CLAUDE.md`.

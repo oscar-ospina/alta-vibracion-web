@@ -1,4 +1,4 @@
-# Booking setup — Google Calendar (epic #31, Phase 1)
+# Booking setup — Google Calendar (booking Phase 1)
 
 One-time setup so the in-app **Agenda** can read Liliana's availability and write booked
 appointments to her real Google Calendar. Do this once; then `npm run smoke:calendar`
@@ -6,8 +6,8 @@ verifies it end-to-end.
 
 This implements the two ADRs (the design rationale lives there, not here):
 
-- [Google Calendar integration](https://github.com/oscar-ospina/saas-planner/blob/main/docs/superpowers/specs/2026-06-07-av-google-calendar.md) (#32)
-- [Booking backend & data](https://github.com/oscar-ospina/saas-planner/blob/main/docs/superpowers/specs/2026-06-07-av-booking-backend.md) (#33)
+- [Google Calendar integration](adr/2026-06-07-av-google-calendar.md)
+- [Booking backend & data](adr/2026-06-07-av-booking-backend.md)
 
 ## The auth model in one paragraph
 
