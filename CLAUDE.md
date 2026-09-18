@@ -24,6 +24,8 @@ The launch plan lives outside the repo at `../Alta_Vibracion_729_Plan_Ejecucion_
 - `@saas/ui@0.2.0` ships no `"use client"`. Radix-backed Select/Dialog need a client boundary in this repo.
 - ESLint stays on `^9`; `eslint-config-next`'s plugins cap there.
 - Next 16 renamed middleware to `proxy.ts`. Read `node_modules/next/dist/docs/` before touching routing, caching or server actions.
+- Vercel: team `saas-alta`, CLI login must be the GitHub account. `vercel redeploy <url> --target production --non-interactive` applies new env vars. `ADMIN_*` are sensitive vars; `vercel env pull` writes `[SENSITIVE]`. Pull production env to a scratch file, never `.env.local`.
+- Drizzle wraps driver errors; the SQLSTATE is on `err.cause` (see `unwrapPgError` in `lib/agenda/bookings.ts`). Stop local `next start` with `fuser -k <port>/tcp`; `pkill -f "next start"` kills the calling shell.
 
 ## Verify before merging
 
