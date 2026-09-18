@@ -130,7 +130,7 @@ export async function findBookingByCode(code: string): Promise<Booking | null> {
   return row ?? null;
 }
 
-/** Bookings from the start of today (Bogotá) onward, soonest first. */
+/** Bookings that start after 24 hours ago, soonest first (recent past stays visible). */
 export async function listUpcomingBookings(now: Date = new Date()): Promise<Booking[]> {
   const db = getDb();
   const dayAgo = addMinutes(now, -24 * 60);
@@ -141,22 +141,59 @@ export async function listUpcomingBookings(now: Date = new Date()): Promise<Book
     .orderBy(schema.bookings.startsAt);
 }
 
+export type SetStatusResult =
+  | { ok: true; booking: Booking }
+  | { ok: false; error: "not_found" | "hold_expired" | "not_pending" | "slot_taken" };
+
+/**
+ * Admin transitions. Confirm only applies to a pending booking whose hold is
+ * still alive: a late payment on an expired hold must not revive a row whose
+ * slot another visitor may have taken (the plan's "pago tardío" case). Cancel
+ * applies to pending or confirmed rows.
+ */
 export async function setBookingStatus(
   id: string,
   status: "confirmed" | "cancelled",
   now: Date = new Date(),
-): Promise<Booking | null> {
+): Promise<SetStatusResult> {
   const db = getDb();
-  const [row] = await db
-    .update(schema.bookings)
-    .set({
-      status,
-      updatedAt: now,
-      confirmedAt: status === "confirmed" ? now : sql`${schema.bookings.confirmedAt}`,
-    })
+  const [current] = await db
+    .select()
+    .from(schema.bookings)
     .where(eq(schema.bookings.id, id))
-    .returning();
-  return row ?? null;
+    .limit(1);
+  if (!current) return { ok: false, error: "not_found" };
+
+  if (status === "confirmed") {
+    if (current.status !== "pending_payment") return { ok: false, error: "not_pending" };
+    if (current.holdExpiresAt.getTime() <= now.getTime()) {
+      return { ok: false, error: "hold_expired" };
+    }
+  } else if (current.status !== "pending_payment" && current.status !== "confirmed") {
+    return { ok: false, error: "not_pending" };
+  }
+
+  try {
+    const [row] = await db
+      .update(schema.bookings)
+      .set({
+        status,
+        updatedAt: now,
+        confirmedAt: status === "confirmed" ? now : sql`${schema.bookings.confirmedAt}`,
+      })
+      .where(
+        and(
+          eq(schema.bookings.id, id),
+          eq(schema.bookings.status, current.status),
+        ),
+      )
+      .returning();
+    if (!row) return { ok: false, error: "not_pending" };
+    return { ok: true, booking: row };
+  } catch (err) {
+    if (unwrapPgError(err)?.code === "23505") return { ok: false, error: "slot_taken" };
+    throw err;
+  }
 }
 
 /**

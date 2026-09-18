@@ -89,7 +89,7 @@ function buildHandoffMessage(args: {
   );
 }
 
-export function AgendaFlow({ slots }: { slots: Slot[] }) {
+export function AgendaFlow({ slots, holdHours }: { slots: Slot[]; holdHours: number }) {
   const searchParams = useSearchParams();
   const consultationParam = searchParams.get("consultation");
   const origin = searchParams.get("origen") ?? "";
@@ -146,7 +146,7 @@ export function AgendaFlow({ slots }: { slots: Slot[] }) {
             Tu horario quedó reservado. Falta el pago.
           </h2>
           <p className="text-muted-foreground">
-            Guardamos tu horario por 24 horas mientras Liliana verifica el pago.
+            Guardamos tu horario por {holdHours} horas mientras Liliana verifica el pago.
             Escríbele por WhatsApp con tu código para recibir los datos de pago.
             La cita queda confirmada cuando ella verifique la transferencia.
           </p>
@@ -305,8 +305,8 @@ export function AgendaFlow({ slots }: { slots: Slot[] }) {
               />
             )}
             <p className="mt-3 text-xs text-muted-foreground">
-              Sesiones de lunes a jueves a las 6:00 p. m., hora de Colombia. Si necesitas
-              otro horario, escríbenos.
+              Horarios en hora de Colombia. Si ninguno te sirve, escríbenos y buscamos
+              una opción.
             </p>
           </CardContent>
         </Card>

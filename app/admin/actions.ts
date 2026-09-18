@@ -1,24 +1,34 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdmin } from "@/lib/admin-auth-server";
 import { setBookingStatus } from "@/lib/agenda/bookings";
 import { HHMM_RE, ISO_DATE_RE } from "@/lib/agenda/time";
 
-export async function confirmBooking(formData: FormData) {
+const NOTICE: Record<string, string> = {
+  not_found: "La reserva no existe.",
+  hold_expired: "El plazo de pago venció; el horario pudo ser tomado por otra persona. Pide al cliente reservar de nuevo.",
+  not_pending: "La reserva ya no está pendiente.",
+  slot_taken: "Otra reserva activa ocupa ese horario. No se confirmó.",
+};
+
+async function transition(formData: FormData, status: "confirmed" | "cancelled") {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
-  if (id) await setBookingStatus(id, "confirmed");
+  const res = id ? await setBookingStatus(id, status) : ({ ok: false, error: "not_found" } as const);
   revalidatePath("/admin");
+  if (!res.ok) redirect(`/admin?aviso=${encodeURIComponent(NOTICE[res.error])}`);
+}
+
+export async function confirmBooking(formData: FormData) {
+  await transition(formData, "confirmed");
 }
 
 export async function cancelBooking(formData: FormData) {
-  await requireAdmin();
-  const id = String(formData.get("id") ?? "");
-  if (id) await setBookingStatus(id, "cancelled");
-  revalidatePath("/admin");
+  await transition(formData, "cancelled");
 }
 
 export async function addOverride(formData: FormData) {
@@ -31,13 +41,13 @@ export async function addOverride(formData: FormData) {
   const time = timeRaw ? timeRaw : null;
   if (time && !HHMM_RE.test(time)) return;
   if (kind === "extra" && !time) return;
-  await getDb().insert(schema.availabilityOverrides).values({
-    date,
-    kind,
-    time,
-    durationMinutes: kind === "extra" ? 75 : null,
-    note,
-  });
+  let durationMinutes: number | null = null;
+  if (kind === "extra") {
+    // Same length as the regular slots, so an extra morning protects the same time.
+    const [rule] = await getDb().select().from(schema.availabilityRules).limit(1);
+    durationMinutes = rule?.durationMinutes ?? 135;
+  }
+  await getDb().insert(schema.availabilityOverrides).values({ date, kind, time, durationMinutes, note });
   revalidatePath("/admin");
   revalidatePath("/agenda");
 }

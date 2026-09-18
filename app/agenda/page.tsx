@@ -4,6 +4,7 @@ import { MessageCircle } from "lucide-react";
 import { Button } from "@saas/ui";
 import { hasDatabase } from "@/db/client";
 import { loadAvailability } from "@/lib/agenda/availability";
+import { holdHours } from "@/lib/agenda/bookings";
 import { whatsappUrl } from "@/lib/site";
 import { AgendaFlow, AgendaSkeleton } from "@/components/agenda/agenda-flow";
 
@@ -38,7 +39,7 @@ export default async function AgendaPage() {
 
       {online ? (
         <Suspense fallback={<AgendaSkeleton />}>
-          <AgendaFlow slots={slots} />
+          <AgendaFlow slots={slots} holdHours={holdHours()} />
         </Suspense>
       ) : (
         <div className="mt-8" data-testid="agenda-fallback">

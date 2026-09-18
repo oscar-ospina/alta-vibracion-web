@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export const STATUS_LABEL: Record<string, { label: string; hint: string }> = {
+const STATUS_LABEL: Record<string, { label: string; hint: string }> = {
   pending_payment: {
     label: "Pendiente de pago",
     hint: "Tu horario está reservado mientras Liliana verifica el pago. Si aún no le has escrito, envíale tu código por WhatsApp.",

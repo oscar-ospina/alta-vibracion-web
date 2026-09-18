@@ -156,13 +156,40 @@ describe("createBooking", () => {
     assert.deepEqual(statuses, ["expired", "pending_payment"]);
   });
 
+  it("refuses to confirm an expired hold, and never revives it over a newer booking", async () => {
+    const [slot] = await loadAvailability();
+    const past = new Date(Date.now() - 48 * 3600 * 1000);
+    const old = await createBooking(input(slot.startsAt, "Tarde"), past);
+    assert.ok(old.ok);
+    if (!old.ok) return;
+    const fresh = await createBooking(input(slot.startsAt, "Nueva"));
+    assert.ok(fresh.ok);
+    const res = await setBookingStatus(old.booking.id, "confirmed");
+    assert.deepEqual(res, { ok: false, error: "not_pending" });
+    const rows = await db.select().from(schema.bookings);
+    assert.equal(rows.filter((r) => r.status === "confirmed").length, 0);
+  });
+
+  it("refuses to confirm a pending hold whose time has lapsed", async () => {
+    const [slot] = await loadAvailability();
+    const past = new Date(Date.now() - 48 * 3600 * 1000);
+    const old = await createBooking(input(slot.startsAt, "Tarde"), past);
+    assert.ok(old.ok);
+    if (!old.ok) return;
+    const res = await setBookingStatus(old.booking.id, "confirmed");
+    assert.deepEqual(res, { ok: false, error: "hold_expired" });
+  });
+
   it("keeps a confirmed slot blocked even after the hold window", async () => {
     const [slot] = await loadAvailability();
     const past = new Date(Date.now() - 48 * 3600 * 1000);
     const first = await createBooking(input(slot.startsAt), past);
     assert.ok(first.ok);
     if (!first.ok) return;
-    await setBookingStatus(first.booking.id, "confirmed");
+    // Confirm while the hold is alive (the row was created 48 h ago with a 24 h hold,
+    // so pass a "now" inside that window).
+    const confirmed = await setBookingStatus(first.booking.id, "confirmed", new Date(past.getTime() + 3600 * 1000));
+    assert.ok(confirmed.ok);
     const second = await createBooking(input(slot.startsAt, "Nueva"));
     assert.deepEqual(second, { ok: false, error: "unavailable" });
   });

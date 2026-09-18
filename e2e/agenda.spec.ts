@@ -21,7 +21,7 @@ async function pickFirstSlot(page: Page) {
 
 test("books the Monday–Thursday 18:00 slot, gets a code, and the slot disappears", async ({ page }) => {
   await page.goto("/agenda?consultation=yo-01&origen=encuentro-01");
-  await expect(page.getByText("Sesiones de lunes a jueves a las 6:00 p. m.")).toBeVisible();
+  await expect(page.getByText("Horarios en hora de Colombia.")).toBeVisible();
 
   const dayLabel = await pickFirstSlot(page);
   await page.getByLabel("Tu nombre").fill("Ana Prueba");

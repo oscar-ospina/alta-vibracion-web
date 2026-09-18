@@ -29,7 +29,12 @@ const FOCUS_RING =
  * availability exceptions. Page loads are challenged by proxy.ts; each action
  * re-checks credentials itself.
  */
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ aviso?: string }>;
+}) {
+  const { aviso } = await searchParams;
   if (!hasDatabase()) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-10">
@@ -54,6 +59,12 @@ export default async function AdminPage() {
         Confirma una reserva solo después de verificar el pago en la cuenta. Las horas
         se muestran en hora de Colombia.
       </p>
+
+      {aviso && (
+        <p role="alert" data-testid="admin-notice" className="mt-4 rounded-lg bg-orange-50 px-4 py-3 text-sm font-semibold text-brand-ink">
+          {aviso}
+        </p>
+      )}
 
       <h2 className="mt-8 text-xl font-bold text-foreground">Próximas reservas</h2>
       {bookings.length === 0 ? (
