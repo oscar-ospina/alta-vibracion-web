@@ -6,11 +6,20 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdmin } from "@/lib/admin-auth-server";
 import { setBookingStatus } from "@/lib/agenda/bookings";
+import { markAttended, markFollowUpDone, markIntakeReceived, saveReport } from "@/lib/agenda/delivery";
 import { HHMM_RE, ISO_DATE_RE, addDays, bogotaInstant, weekdayOf } from "@/lib/agenda/time";
 import type { AdminNoticeKey } from "@/lib/agenda/labels";
 
 function notify(key: AdminNoticeKey): never {
   redirect(`/admin?aviso=${key}`);
+}
+
+/** Same idea for the per-booking page; a bad id falls back to the list. */
+function notifyBooking(id: string, key: AdminNoticeKey): never {
+  revalidatePath("/admin");
+  if (!id) redirect(`/admin?aviso=${key}`);
+  revalidatePath(`/admin/bookings/${id}`);
+  redirect(`/admin/bookings/${id}?aviso=${key}`);
 }
 
 async function transition(formData: FormData, status: "confirmed" | "cancelled") {
@@ -78,4 +87,38 @@ export async function deleteOverride(formData: FormData) {
   }
   revalidatePath("/admin");
   revalidatePath("/agenda");
+}
+
+// Delivery marks and the report (lib/agenda/delivery.ts).
+
+export async function setIntakeReceived(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const received = String(formData.get("received") ?? "") === "1";
+  const res = id ? await markIntakeReceived(id, received) : ({ ok: false, error: "not_found" } as const);
+  notifyBooking(id, res.ok ? "saved" : res.error);
+}
+
+export async function setAttended(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const res = id ? await markAttended(id) : ({ ok: false, error: "not_found" } as const);
+  notifyBooking(id, res.ok ? "saved" : res.error);
+}
+
+export async function setFollowUpDone(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const res = id ? await markFollowUpDone(id) : ({ ok: false, error: "not_found" } as const);
+  notifyBooking(id, res.ok ? "saved" : res.error);
+}
+
+export async function submitReport(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const status = String(formData.get("status") ?? "");
+  const body = String(formData.get("body") ?? "").slice(0, 20_000);
+  if (status !== "draft" && status !== "reviewed" && status !== "approved") notifyBooking(id, "bad_status");
+  const res = id ? await saveReport(id, { body, status }) : ({ ok: false, error: "not_found" } as const);
+  notifyBooking(id, res.ok ? "saved" : res.error);
 }

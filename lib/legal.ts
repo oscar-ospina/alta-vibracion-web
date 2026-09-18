@@ -15,3 +15,10 @@ export type LegalSlug = "terms" | "privacy" | "contact";
 export function readLegalDoc(slug: LegalSlug): string {
   return readFileSync(join(process.cwd(), "content", `${slug}.md`), "utf8");
 }
+
+/** Private operating docs rendered under /admin (script, week plan). Same build-time read. */
+export type AdminDocSlug = "script" | "week-plan";
+
+export function readAdminDoc(slug: AdminDocSlug): string {
+  return readFileSync(join(process.cwd(), "content", "admin", `${slug}.md`), "utf8");
+}

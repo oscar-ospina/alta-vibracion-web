@@ -159,7 +159,7 @@ export async function listUpcomingBookings(now: Date = new Date()): Promise<Book
 
 export type SetStatusResult =
   | { ok: true; booking: Booking }
-  | { ok: false; error: "not_found" | "hold_expired" | "not_pending" | "slot_taken" };
+  | { ok: false; error: "not_found" | "hold_expired" | "not_pending" | "slot_taken" | "attended" };
 
 /**
  * Admin transitions. Confirm only applies to a pending booking whose hold is
@@ -187,6 +187,9 @@ export async function setBookingStatus(
     }
   } else if (current.status !== "pending_payment" && current.status !== "confirmed") {
     return { ok: false, error: "not_pending" };
+  } else if (current.attendedAt) {
+    // A session that took place is history, not a slot to free.
+    return { ok: false, error: "attended" };
   }
 
   try {

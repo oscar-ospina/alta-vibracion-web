@@ -72,6 +72,8 @@ npm run db:migrate
 
 Liliana opens `/admin` (Basic auth), confirms a booking after seeing the transfer, or cancels it. She closes days or adds an extra slot in the exceptions form. Confirmed sessions she copies to her own calendar by hand.
 
+After confirming, each booking's code links to its own page. There she marks the pre-session form as received when it arrives (the form itself is external), marks the session as attended once it happened, writes the summary from the template and saves it as draft, reviewed or approved. Only the approved text appears on the client's `/agenda/<code>` page; saving it again as draft hides it. Fourteen days after the session the booking shows up under "Seguimiento del día 14" until she marks the follow-up done. `/admin/script` holds the operating script and the seven-day plan.
+
 ## Changing the schema
 
 Edit `db/schema.ts`, then `npm run db:generate` to produce a new file under `drizzle/`, commit it, and run `npm run db:migrate` locally and against Neon.

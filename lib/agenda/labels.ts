@@ -20,6 +20,24 @@ export const STATUS_LABEL: Record<BookingStatus, { label: string; hint: string }
   },
 };
 
+/** Stages that only the delivery marks produce (see lib/agenda/delivery.ts). */
+export const STAGE_LABEL: Record<"attended" | "delivered", { label: string; hint: string }> = {
+  attended: {
+    label: "Sesión realizada",
+    hint: "Liliana está preparando tu resumen. Lo verás aquí mismo cuando esté aprobado.",
+  },
+  delivered: {
+    label: "Resumen entregado",
+    hint: "Tu resumen está listo. Guárdalo; esta página es privada y solo la abre tu código.",
+  },
+};
+
+export const REPORT_STATUS_LABEL: Record<"draft" | "reviewed" | "approved", string> = {
+  draft: "Borrador",
+  reviewed: "Revisado",
+  approved: "Aprobado",
+};
+
 /** Admin notices, keyed so the key travels in the URL and the copy stays here. */
 export const ADMIN_NOTICE = {
   not_found: "La reserva no existe.",
@@ -31,6 +49,11 @@ export const ADMIN_NOTICE = {
   bad_time: "La hora no es válida (formato HH:MM).",
   overlap: "Esa hora extra se solapa con un horario ya existente ese día.",
   saved: "Guardado.",
+  not_confirmed: "Solo una reserva confirmada puede marcarse.",
+  not_attended: "Marca primero la sesión como realizada.",
+  attended: "No se cancela una sesión ya realizada.",
+  empty: "Escribe el resumen antes de marcarlo como revisado o aprobado.",
+  bad_status: "Estado del informe no válido.",
 } as const;
 
 export type AdminNoticeKey = keyof typeof ADMIN_NOTICE;

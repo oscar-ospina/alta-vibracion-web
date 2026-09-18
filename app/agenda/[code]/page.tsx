@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import { MessageCircle } from "lucide-react";
 import { Button, Card, CardContent } from "@saas/ui";
 import { hasDatabase } from "@/db/client";
-import { effectiveStatus, findBookingByCode } from "@/lib/agenda/bookings";
+import { findBookingByCode } from "@/lib/agenda/bookings";
+import { deliveryStage, findApprovedReport } from "@/lib/agenda/delivery";
 import { BOGOTA, formatInZone } from "@/lib/agenda/time";
-import { STATUS_LABEL } from "@/lib/agenda/labels";
+import { STAGE_LABEL, STATUS_LABEL } from "@/lib/agenda/labels";
 import { findConsultation, formatCOP } from "@/lib/consultations";
 import { whatsappUrl } from "@/lib/site";
+import { Prose } from "@/components/sections/prose";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +32,11 @@ export default async function BookingStatusPage({
   });
   if (!booking) notFound();
 
-  const status = effectiveStatus(booking);
+  // Only an approved report leaves the admin; drafts never reach this page.
+  const report = booking.attendedAt ? await findApprovedReport(booking.id) : null;
+  const stage = deliveryStage(booking, report);
   const service = findConsultation(booking.serviceId);
-  const info = STATUS_LABEL[status];
+  const info = stage === "attended" || stage === "delivered" ? STAGE_LABEL[stage] : STATUS_LABEL[stage];
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 lg:px-10">
@@ -84,6 +88,15 @@ export default async function BookingStatusPage({
           </Button>
         </CardContent>
       </Card>
+      {report && (
+        <Card className="mt-6">
+          <CardContent>
+            <div data-testid="booking-report">
+              <Prose>{report.body}</Prose>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

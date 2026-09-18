@@ -1,11 +1,21 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { gte } from "drizzle-orm";
 import { Button, Card, CardContent, Input, Label, cn } from "@saas/ui";
 import { getDb, hasDatabase, schema } from "@/db/client";
-import { effectiveStatus, listUpcomingBookings } from "@/lib/agenda/bookings";
+import { listUpcomingBookings } from "@/lib/agenda/bookings";
+import {
+  FOLLOW_UP_DAYS,
+  deliveryStage,
+  listFollowUpsDue,
+  listPendingDeliveries,
+  listPendingIntake,
+  reportsByBookingId,
+  type BookingWithReport,
+} from "@/lib/agenda/delivery";
 import { BOGOTA, formatInZone, formatLongDate, todayInBogota } from "@/lib/agenda/time";
 import { findConsultation, formatCOP } from "@/lib/consultations";
-import { ADMIN_NOTICE, STATUS_LABEL, type AdminNoticeKey } from "@/lib/agenda/labels";
+import { ADMIN_NOTICE, REPORT_STATUS_LABEL, STAGE_LABEL, STATUS_LABEL, type AdminNoticeKey } from "@/lib/agenda/labels";
 import { addOverride, cancelBooking, confirmBooking, deleteOverride } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +28,32 @@ export const metadata: Metadata = {
 const FOCUS_RING =
   "focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring";
 
+const LINK = "text-brand-ink underline underline-offset-2";
+
+function stageLabel(stage: ReturnType<typeof deliveryStage>): string {
+  return stage === "attended" || stage === "delivered" ? STAGE_LABEL[stage].label : STATUS_LABEL[stage].label;
+}
+
+/** One row of the pending lists: when, code, name, link to the booking page. */
+function PendingList({ rows, testId, empty }: { rows: { id: string; code: string; startsAt: Date; customerName: string; extra?: string }[]; testId: string; empty: string }) {
+  if (rows.length === 0) return <p className="mt-2 text-sm text-muted-foreground">{empty}</p>;
+  return (
+    <ul className="mt-2 space-y-1 text-sm" data-testid={testId}>
+      {rows.map((r) => (
+        <li key={r.id} data-code={r.code} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2">
+          <span className="whitespace-nowrap">{formatInZone(r.startsAt, BOGOTA)}</span>
+          <Link href={`/admin/bookings/${r.id}`} className={cn("font-mono", LINK)}>{r.code}</Link>
+          <span>{r.customerName}</span>
+          {r.extra && <span className="text-muted-foreground">{r.extra}</span>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /**
- * Private admin: upcoming bookings with confirm/cancel, and per-date
+ * Private admin: upcoming bookings with confirm/cancel, the three pending
+ * lists from the plan (forms, deliveries, day-14 follow-ups) and per-date
  * availability exceptions. Page loads are challenged by proxy.ts; each action
  * re-checks credentials itself.
  */
@@ -40,14 +74,22 @@ export default async function AdminPage({
   const now = new Date();
   let bookings: Awaited<ReturnType<typeof listUpcomingBookings>> = [];
   let overrides: (typeof schema.availabilityOverrides.$inferSelect)[] = [];
+  let reports = new Map<string, typeof schema.reports.$inferSelect>();
+  let pendingIntake: Awaited<ReturnType<typeof listPendingIntake>> = [];
+  let pendingDeliveries: BookingWithReport[] = [];
+  let followUps: Awaited<ReturnType<typeof listFollowUpsDue>> = [];
   try {
-    [bookings, overrides] = await Promise.all([
-    listUpcomingBookings(now),
-    getDb()
-      .select()
-      .from(schema.availabilityOverrides)
-      .where(gte(schema.availabilityOverrides.date, todayInBogota(now)))
-      .orderBy(schema.availabilityOverrides.date),
+    [bookings, overrides, reports, pendingIntake, pendingDeliveries, followUps] = await Promise.all([
+      listUpcomingBookings(now),
+      getDb()
+        .select()
+        .from(schema.availabilityOverrides)
+        .where(gte(schema.availabilityOverrides.date, todayInBogota(now)))
+        .orderBy(schema.availabilityOverrides.date),
+      reportsByBookingId(),
+      listPendingIntake(),
+      listPendingDeliveries(),
+      listFollowUpsDue(now),
     ]);
   } catch (err) {
     console.error("admin: database unavailable", err);
@@ -63,7 +105,8 @@ export default async function AdminPage({
       <h1 className="text-3xl font-bold text-foreground">Agenda</h1>
       <p className="mt-2 text-muted-foreground">
         Confirma una reserva solo después de verificar el pago en la cuenta. Las horas
-        se muestran en hora de Colombia.
+        se muestran en hora de Colombia.{" "}
+        <Link href="/admin/script" className={LINK}>Guion y plan de siete días</Link>.
       </p>
 
       {notice && (
@@ -91,11 +134,14 @@ export default async function AdminPage({
             </thead>
             <tbody>
               {bookings.map((b) => {
-                const status = effectiveStatus(b, now);
+                const stage = deliveryStage(b, reports.get(b.id) ?? null, now);
+                const status = stage === "attended" || stage === "delivered" ? "confirmed" : stage;
                 return (
                   <tr key={b.id} className="border-b align-top" data-code={b.code}>
                     <td className="py-2 pr-3 whitespace-nowrap">{formatInZone(b.startsAt, BOGOTA)}</td>
-                    <td className="py-2 pr-3 font-mono">{b.code}</td>
+                    <td className="py-2 pr-3 font-mono">
+                      <Link href={`/admin/bookings/${b.id}`} className={LINK}>{b.code}</Link>
+                    </td>
                     <td className="py-2 pr-3">
                       {findConsultation(b.serviceId)?.name ?? b.serviceId}
                       <span className="block text-xs text-muted-foreground">{formatCOP(b.priceCop)}</span>
@@ -111,7 +157,7 @@ export default async function AdminPage({
                       <span className="block text-xs text-muted-foreground">{b.contactChannel}</span>
                     </td>
                     <td className="py-2 pr-3 font-semibold" data-testid="admin-status">
-                      {STATUS_LABEL[status].label}
+                      {stageLabel(stage)}
                     </td>
                     <td className="py-2">
                       {status === "pending_payment" && (
@@ -126,7 +172,7 @@ export default async function AdminPage({
                           </form>
                         </div>
                       )}
-                      {status === "confirmed" && (
+                      {status === "confirmed" && !b.attendedAt && (
                         <form action={cancelBooking}>
                           <input type="hidden" name="id" value={b.id} />
                           <Button size="sm" variant="outline" type="submit">Cancelar</Button>
@@ -140,6 +186,31 @@ export default async function AdminPage({
           </table>
         </div>
       )}
+
+      <h2 className="mt-10 text-xl font-bold text-foreground">Formularios pendientes</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Sesiones confirmadas cuyo formulario previo aún no llega. Márcalo en la reserva cuando lo recibas.
+      </p>
+      <PendingList rows={pendingIntake} testId="pending-intake" empty="Ningún formulario pendiente." />
+
+      <h2 className="mt-10 text-xl font-bold text-foreground">Entregas pendientes</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Sesiones realizadas sin resumen aprobado. El cliente solo ve el resumen cuando está aprobado.
+      </p>
+      <PendingList
+        rows={pendingDeliveries.map(({ booking, report }) => ({
+          ...booking,
+          extra: report ? `Informe: ${REPORT_STATUS_LABEL[report.status]}` : "Sin informe",
+        }))}
+        testId="pending-deliveries"
+        empty="Ninguna entrega pendiente."
+      />
+
+      <h2 className="mt-10 text-xl font-bold text-foreground">Seguimiento del día {FOLLOW_UP_DAYS}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Sesiones realizadas hace {FOLLOW_UP_DAYS} días o más sin seguimiento. Desaparecen al marcarlo, así nadie recibe dos mensajes.
+      </p>
+      <PendingList rows={followUps} testId="follow-ups" empty="Ningún seguimiento pendiente." />
 
       <h2 className="mt-10 text-xl font-bold text-foreground">Excepciones de disponibilidad</h2>
       <p className="mt-1 text-sm text-muted-foreground">

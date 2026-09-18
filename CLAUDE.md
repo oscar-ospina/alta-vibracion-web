@@ -11,8 +11,8 @@ The launch plan lives outside the repo at `../Alta_Vibracion_729_Plan_Ejecucion_
 - `@saas/ui` stays brand-agnostic. Brand assets, copy and compositions live here, never in the design system.
 - The agenda's double-booking guard is the partial unique index `bookings_active_slot_idx` on `bookings.starts_at`. Do not replace it with application checks.
 - Every mutating server action verifies admin credentials itself (`requireAdmin` in `lib/admin-auth-server.ts`). `proxy.ts` only challenges page loads.
-- A booking becomes `confirmed` only through the admin action, after Liliana verifies the transfer by hand.
-- No personal data in URLs, analytics events, logs or fixtures. Bookings store a preferred name and one contact channel.
+- A booking becomes `confirmed` only through the admin action, after Liliana verifies the transfer by hand. Attended, form-received and follow-up marks are nullable instants on `bookings`, never new `booking_status` values (the guard's predicate depends on them). An attended booking cannot be cancelled.
+- No personal data in URLs, analytics events, logs or fixtures. Bookings store a preferred name and one contact channel; `reports` holds Liliana's session summary, shown to the client only once `approved` (`docs/adr/2026-09-18-delivery-in-admin.md`). The pre-session form stays outside the app until the legal texts are signed off.
 - Without `DATABASE_URL` the build must pass and `/agenda` must render the WhatsApp fallback. Never show simulated availability.
 - Legal copy in `content/terms.md` and `content/privacy.md` is a draft with `[POR CONFIRMAR]` markers. Do not remove the draft banner until Liliana signs off.
 
@@ -25,6 +25,7 @@ The launch plan lives outside the repo at `../Alta_Vibracion_729_Plan_Ejecucion_
 - ESLint stays on `^9`; `eslint-config-next`'s plugins cap there.
 - Next 16 renamed middleware to `proxy.ts`. Read `node_modules/next/dist/docs/` before touching routing, caching or server actions.
 - Vercel: team `saas-alta`, CLI login must be the GitHub account. `vercel redeploy <url> --target production --non-interactive` applies new env vars. `ADMIN_*` are sensitive vars; `vercel env pull` writes `[SENSITIVE]`. Pull production env to a scratch file, never `.env.local`.
+- `npm run test` runs the DB test files one at a time (`--test-concurrency=1`); they share one database and each truncates it.
 - Drizzle wraps driver errors; the SQLSTATE is on `err.cause` (see `unwrapPgError` in `lib/agenda/bookings.ts`). Stop local `next start` with `fuser -k <port>/tcp`; `pkill -f "next start"` kills the calling shell.
 
 ## Verify before merging

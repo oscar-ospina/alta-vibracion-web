@@ -90,6 +90,17 @@ export const bookings = pgTable(
       .notNull()
       .defaultNow(),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    /**
+     * Delivery marks (plan sections 11 and 14). Nullable instants instead of
+     * new `booking_status` values, so the double-booking guard above keeps its
+     * exact predicate. Liliana sets them by hand from /admin.
+     */
+    /** The pre-session form arrived (it lives outside this app). */
+    intakeReceivedAt: timestamp("intake_received_at", { withTimezone: true }),
+    /** The session took place. */
+    attendedAt: timestamp("attended_at", { withTimezone: true }),
+    /** The day-14 follow-up was done; one flag so no client is written twice. */
+    followUpDoneAt: timestamp("follow_up_done_at", { withTimezone: true }),
   },
   (t) => [
     uniqueIndex("bookings_code_idx").on(t.code),
@@ -103,7 +114,29 @@ export const bookings = pgTable(
   ],
 );
 
+export const reportStatus = pgEnum("report_status", ["draft", "reviewed", "approved"]);
+
+/**
+ * The session summary Liliana writes for one booking. Only an `approved`
+ * report is shown to the client on the status page; drafts stay behind
+ * /admin. One report per booking.
+ */
+export const reports = pgTable("reports", {
+  id: serial("id").primaryKey(),
+  bookingId: uuid("booking_id")
+    .notNull()
+    .unique()
+    .references(() => bookings.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  status: reportStatus("status").notNull().default("draft"),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type AvailabilityRule = typeof availabilityRules.$inferSelect;
 export type AvailabilityOverride = typeof availabilityOverrides.$inferSelect;
 export type Booking = typeof bookings.$inferSelect;
 export type BookingStatus = Booking["status"];
+export type Report = typeof reports.$inferSelect;
+export type ReportStatus = Report["status"];
