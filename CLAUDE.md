@@ -9,7 +9,11 @@ The launch plan lives outside the repo at `../Alta_Vibracion_729_Plan_Ejecucion_
 ## Invariants
 
 - `@saas/ui` stays brand-agnostic. Brand assets, copy and compositions live here, never in the design system.
-- No personal data in URLs, analytics events, logs or fixtures.
+- The agenda's double-booking guard is the partial unique index `bookings_active_slot_idx` on `bookings.starts_at`. Do not replace it with application checks.
+- Every mutating server action verifies admin credentials itself (`requireAdmin` in `lib/admin-auth-server.ts`). `proxy.ts` only challenges page loads.
+- A booking becomes `confirmed` only through the admin action, after Liliana verifies the transfer by hand.
+- No personal data in URLs, analytics events, logs or fixtures. Bookings store a preferred name and one contact channel.
+- Without `DATABASE_URL` the build must pass and `/agenda` must render the WhatsApp fallback. Never show simulated availability.
 - Legal copy in `content/terms.md` and `content/privacy.md` is a draft with `[POR CONFIRMAR]` markers. Do not remove the draft banner until Liliana signs off.
 
 ## Gotchas that cost time
@@ -23,4 +27,4 @@ The launch plan lives outside the repo at `../Alta_Vibracion_729_Plan_Ejecucion_
 
 ## Verify before merging
 
-`npm run lint && npm run typecheck && npm run build`. PRs auto-merge after green CI and a clean review.
+`npm run lint && npm run typecheck`, then `npm run test` (node:test against Postgres), `npm run build`, and `npm run test:e2e` (Playwright, two servers from the build: with and without `DATABASE_URL`). `docs/agenda-setup.md` has the local container and the Neon steps. CI runs the same sequence. PRs auto-merge after green CI and a clean review.

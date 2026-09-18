@@ -88,3 +88,5 @@ Podremos actualizar esta Política de Tratamiento de Datos Personales cuando sea
 ## Contáctanos
 
 Para cualquier asunto sobre tus datos personales, escríbenos a **lp.tobon.miranda@gmail.com** o por WhatsApp al **+57 321 741 3770**.
+
+[POR CONFIRMAR: la agenda en línea guarda el nombre preferido, un canal de contacto (WhatsApp o correo), la zona horaria elegida y la fecha de la sesión, en una base de datos administrada por Neon. Revisar con quien asesore legalmente antes del lanzamiento.]

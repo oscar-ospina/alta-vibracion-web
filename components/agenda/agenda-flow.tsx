@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useActionState, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { track } from "@vercel/analytics";
 import { BadgeCheck, MapPin, MessageCircle } from "lucide-react";
@@ -25,68 +26,37 @@ import {
   findConsultation,
   formatCOP,
 } from "@/lib/consultations";
-import { whatsappUrl } from "@/lib/site";
+import { ROUTES, whatsappUrl } from "@/lib/site";
+import type { Slot } from "@/lib/agenda/availability";
 import {
+  BOGOTA,
   type ISODate,
-  type Modality,
-  type MonthCursor,
-  type SlotTime,
-  SLOT_TIMES,
-  buildBookingMessage,
-  firstBookableDate,
+  formatInZone,
   formatLongDate,
-  formatSlotLabel,
-  isBookableDate,
-  lastBookableDate,
+  formatTimeInZone,
+} from "@/lib/agenda/time";
+import {
+  type MonthCursor,
   monthCursorFor,
   sameMonth,
   shiftMonth,
-  todayInBogota,
-} from "@/lib/agenda";
-import {
-  type AgendaState,
-  type BookedSlot,
-  addBooking,
-  ensureBlockedSlots,
-  findBooking,
-  loadAgendaState,
-} from "@/lib/agenda-store";
+} from "@/lib/agenda/calendar";
 import { MonthCalendar } from "@/components/agenda/month-calendar";
+import { TimeZoneSelect, detectTimeZone } from "@/components/agenda/timezone-select";
+import { type BookingFormState, submitBooking } from "@/app/agenda/actions";
 
 /**
- * The local-MVP Agenda flow (story oscar-ospina/saas-planner#45): consultation →
- * modality → date → time → name → WhatsApp handoff. No backend — availability is
- * simulated per viewed date (1–3 slots "Reservado", persisted in localStorage),
- * the visitor's own booking persists too ("Tu cita"), and confirming opens
- * WhatsApp with the full details; Liliana syncs her real calendar manually.
- *
- * Everything that depends on the clock or localStorage is gated on hydration
- * (`useIsHydrated` → skeleton first), so the server HTML and the first client
- * paint match (no hydration mismatch) regardless of when the page was built.
+ * Booking flow: session → date → time → name + contact + time zone → server
+ * action. Slots come from the server (already filtered by holds and
+ * confirmations); the action re-checks them and the database's unique index
+ * has the final word. On success the panel shows the booking code, the
+ * pending-payment status and the WhatsApp handoff.
  */
 
 const FOCUS_RING =
   "focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-/** Session-only summary for the confirmation panel — never persisted (PII). */
-type ConfirmedBooking = {
-  consultationName: string;
-  modality: Modality;
-  date: ISODate;
-  time: SlotTime;
-  name: string;
-};
-
-// Hydration gate without setState-in-effect: the server snapshot is false, the
-// client snapshot true — React re-renders once right after hydration.
 const subscribeNoop = () => () => {};
-function useIsHydrated(): boolean {
-  return useSyncExternalStore(
-    subscribeNoop,
-    () => true,
-    () => false,
-  );
-}
 
 export function AgendaSkeleton() {
   return (
@@ -102,178 +72,147 @@ export function AgendaSkeleton() {
           </Card>
         ))}
       </div>
-      <Card className="mt-5">
-        <CardContent className="flex items-center justify-between">
-          <div className="h-8 w-32 animate-pulse rounded bg-neutral-100" />
-          <div className="h-10 w-56 animate-pulse rounded bg-neutral-100" />
-        </CardContent>
-      </Card>
     </div>
   );
 }
 
-export function AgendaFlow() {
+function buildHandoffMessage(args: {
+  name: string;
+  code: string;
+  serviceName: string;
+  startsAt: Date;
+}): string {
+  return (
+    `Hola, soy ${args.name}. Reservé «${args.serviceName}» para el ` +
+    `${formatInZone(args.startsAt, BOGOTA)} (hora de Colombia). ` +
+    `Mi código es ${args.code}. ¿Me envías los datos de pago?`
+  );
+}
+
+export function AgendaFlow({ slots }: { slots: Slot[] }) {
   const searchParams = useSearchParams();
   const consultationParam = searchParams.get("consultation");
-  const hydrated = useIsHydrated();
+  const origin = searchParams.get("origen") ?? "";
 
-  // Bogotá "today" is clock-dependent → only computed client-side, post-gate.
-  const today = useMemo<ISODate | null>(
-    () => (hydrated ? todayInBogota() : null),
-    [hydrated],
-  );
-
-  // Preselect from /agenda?consultation=<id> (the grid's CTAs).
   const [consultation, setConsultation] = useState<Consultation>(() => {
     const found = findConsultation(consultationParam);
     return found?.bookable ? found : BOOKABLE_CONSULTATIONS[0];
   });
-  const modality: Modality = "virtual";
-  // null = "no user override yet" → derived defaults below.
-  const [cursorOverride, setCursorOverride] = useState<MonthCursor | null>(
-    null,
-  );
-  const [agendaOverride, setAgendaOverride] = useState<AgendaState | null>(
-    null,
-  );
+  const [cursorOverride, setCursorOverride] = useState<MonthCursor | null>(null);
   const [selectedDate, setSelectedDate] = useState<ISODate | null>(null);
-  const [selectedTime, setSelectedTime] = useState<SlotTime | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [name, setName] = useState("");
-  const [confirmed, setConfirmed] = useState<ConfirmedBooking | null>(null);
+  const [channel, setChannel] = useState<"whatsapp" | "email">("whatsapp");
+  const [contact, setContact] = useState("");
+  // Server snapshot is Bogotá so server HTML and first client paint agree; the
+  // browser's zone takes over right after hydration. The visitor can override.
+  const detectedTimeZone = useSyncExternalStore(subscribeNoop, detectTimeZone, () => BOGOTA);
+  const [timeZoneOverride, setTimeZoneOverride] = useState<string | null>(null);
+  const timeZone = timeZoneOverride ?? detectedTimeZone;
 
-  // The early return guarantees `hydrated` below it — `today` is derived from it.
-  if (!today) return <AgendaSkeleton />;
+  const [state, formAction, pending] = useActionState<BookingFormState, FormData>(
+    submitBooking,
+    { status: "idle" },
+  );
 
-  const cursor = cursorOverride ?? monthCursorFor(firstBookableDate(today));
-  // loadAgendaState() reads localStorage once and returns the stable module
-  // cache afterwards, so deriving it during render is cheap and loop-safe.
-  const agenda = agendaOverride ?? loadAgendaState();
+  const slotsByDate = useMemo(() => {
+    const map = new Map<ISODate, Slot[]>();
+    for (const s of slots) map.set(s.date, [...(map.get(s.date) ?? []), s]);
+    return map;
+  }, [slots]);
+  const dates = useMemo(() => [...slotsByDate.keys()].sort(), [slotsByDate]);
 
-  const minCursor = monthCursorFor(firstBookableDate(today));
-  const maxCursor = monthCursorFor(lastBookableDate(today));
-  const blockedForDate = selectedDate ? (agenda.blocked[selectedDate] ?? []) : [];
+  useEffect(() => {
+    if (state.status === "created") {
+      track("booking_created", { service: state.serviceId, origin: origin || "direct" });
+    }
+  }, [state, origin]);
 
-  const trimmedName = name.trim();
-  const ready =
-    selectedDate !== null && selectedTime !== null && trimmedName.length >= 2;
-
-  const confirmHref = ready
-    ? whatsappUrl(
-        buildBookingMessage({
-          name: trimmedName,
-          consultationName: consultation.name,
-          modality,
-          date: selectedDate,
-          time: selectedTime,
-        }),
-      )
-    : undefined;
-
-  function handleSelectDate(date: ISODate) {
-    // First view of a date rolls its 1–3 simulated-busy slots and persists them.
-    ensureBlockedSlots(date);
-    setAgendaOverride(loadAgendaState());
-    setSelectedDate(date);
-    setSelectedTime(null);
-  }
-
-  function handleConfirm() {
-    if (!ready || !selectedDate || !selectedTime) return;
-    const slot: BookedSlot = {
-      date: selectedDate,
-      time: selectedTime,
-      createdAt: new Date().toISOString(),
-    };
-    setAgendaOverride(addBooking(slot));
-    setConfirmed({
-      consultationName: consultation.name,
-      modality,
-      date: selectedDate,
-      time: selectedTime,
-      name: trimmedName,
-    });
-    track("book_consultation", {
-      source: "agenda",
-      consultation: consultation.name,
-      modality,
-    });
-  }
-
-  if (confirmed) {
-    const reopenHref = whatsappUrl(
-      buildBookingMessage({
-        name: confirmed.name,
-        consultationName: confirmed.consultationName,
-        modality: confirmed.modality,
-        date: confirmed.date,
-        time: confirmed.time,
+  if (state.status === "created") {
+    const startsAt = new Date(state.startsAt);
+    const service = findConsultation(state.serviceId);
+    const handoff = whatsappUrl(
+      buildHandoffMessage({
+        name: state.customerName,
+        code: state.code,
+        serviceName: service?.name ?? state.serviceId,
+        startsAt,
       }),
     );
     return (
-      <Card className="mt-8 max-w-2xl">
+      <Card className="mt-8 max-w-2xl" data-testid="booking-created">
         <CardContent className="space-y-4">
-          {/* Deliberately NOT a success state: the request only exists once the
-              visitor presses send inside WhatsApp — which we can't observe. The
-              panel frames the send as the pending last step (review finding). */}
-          <div className="flex items-center gap-3">
-            <MessageCircle className="size-8 text-brand-ink" aria-hidden />
-            <h2 className="text-xl font-bold text-foreground">
-              Último paso: envía el mensaje en WhatsApp
-            </h2>
-          </div>
+          <h2 className="text-xl font-bold text-foreground">
+            Tu horario quedó reservado. Falta el pago.
+          </h2>
           <p className="text-muted-foreground">
-            Abrimos WhatsApp en otra pestaña con los detalles de tu solicitud
-            — solo falta que <strong>envíes el mensaje</strong>. Lili revisará
-            su disponibilidad y te confirmará por ese mismo chat. El pago
-            también se coordina por WhatsApp.
+            Guardamos tu horario por 24 horas mientras Liliana verifica el pago.
+            Escríbele por WhatsApp con tu código para recibir los datos de pago.
+            La cita queda confirmada cuando ella verifique la transferencia.
           </p>
           <dl className="space-y-1 rounded-xl bg-orange-50 p-4 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="font-semibold text-foreground">Consulta</dt>
-              <dd className="text-right">{confirmed.consultationName}</dd>
+              <dt className="font-semibold text-foreground">Código</dt>
+              <dd className="font-mono text-base font-bold" data-testid="booking-code">
+                {state.code}
+              </dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="font-semibold text-foreground">Modalidad</dt>
-              <dd className="capitalize">{confirmed.modality}</dd>
+              <dt className="font-semibold text-foreground">Sesión</dt>
+              <dd className="text-right">{service?.name}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="font-semibold text-foreground">Fecha</dt>
-              <dd className="text-right">{formatLongDate(confirmed.date)}</dd>
+              <dt className="font-semibold text-foreground">Hora de Colombia</dt>
+              <dd className="text-right">{formatInZone(startsAt, BOGOTA)}</dd>
             </div>
+            {state.clientTimeZone !== BOGOTA && (
+              <div className="flex justify-between gap-4">
+                <dt className="font-semibold text-foreground">Tu hora</dt>
+                <dd className="text-right" data-testid="booking-local-time">
+                  {formatInZone(startsAt, state.clientTimeZone)} ({state.clientTimeZone})
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between gap-4">
-              <dt className="font-semibold text-foreground">Hora</dt>
-              <dd>{formatSlotLabel(confirmed.time)} (hora de Colombia)</dd>
+              <dt className="font-semibold text-foreground">Estado</dt>
+              <dd>Pendiente de pago</dd>
             </div>
           </dl>
           <div className="flex flex-wrap gap-3">
-            <Button asChild>
-              <a href={reopenHref} target="_blank" rel="noopener noreferrer">
-                <MessageCircle className="size-4" aria-hidden />
-                Abrir WhatsApp de nuevo
+            <Button asChild size="lg">
+              <a
+                href={handoff}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => track("book_consultation", { source: "agenda" })}
+              >
+                <MessageCircle className="size-5" aria-hidden />
+                Enviar mi código por WhatsApp
               </a>
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setConfirmed(null);
-                setSelectedTime(null);
-              }}
-            >
-              Agendar otra consulta
+            <Button variant="outline" asChild>
+              <Link href={`${ROUTES.agenda}/${state.code}`}>Ver estado de mi reserva</Link>
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Para cambios o cancelaciones, escríbenos por el mismo chat.
-          </p>
         </CardContent>
       </Card>
     );
   }
 
+  const fallbackDate = dates[0] ?? new Date().toISOString().slice(0, 10);
+  const cursor = cursorOverride ?? monthCursorFor(fallbackDate);
+  const minCursor = monthCursorFor(fallbackDate);
+  const maxCursor = monthCursorFor(dates[dates.length - 1] ?? fallbackDate);
+  const daySlots = selectedDate ? (slotsByDate.get(selectedDate) ?? []) : [];
+  const ready = selectedSlot !== null && name.trim().length >= 2 && contact.trim().length > 0;
+
   return (
-    <div className="mt-8">
+    <form action={formAction} className="mt-8">
+      <input type="hidden" name="serviceId" value={consultation.id} />
+      <input type="hidden" name="startsAt" value={selectedSlot?.startsAt ?? ""} />
+      <input type="hidden" name="origin" value={origin} />
+
       <div className="grid items-start gap-5 lg:grid-cols-[300px_minmax(0,1fr)_240px]">
-        {/* Rail: consultant + consultation + modality (design kit's left column). */}
         <Card>
           <CardContent className="flex flex-col gap-5">
             <div className="flex items-center gap-3">
@@ -303,7 +242,7 @@ export function AgendaFlow() {
                 id="consultation-label"
                 className="text-xs font-bold uppercase tracking-wider text-violet-700"
               >
-                Consulta
+                Sesión
               </Label>
               <Select
                 value={consultation.id}
@@ -312,10 +251,7 @@ export function AgendaFlow() {
                   if (found?.bookable) setConsultation(found);
                 }}
               >
-                <SelectTrigger
-                  aria-labelledby="consultation-label"
-                  className="mt-2 w-full"
-                >
+                <SelectTrigger aria-labelledby="consultation-label" className="mt-2 w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -345,85 +281,66 @@ export function AgendaFlow() {
           </CardContent>
         </Card>
 
-        {/* Calendar */}
         <Card>
           <CardContent>
-            <h2 className="mb-4 text-sm font-bold text-foreground">
-              Selecciona la fecha
-            </h2>
-            <MonthCalendar
-              cursor={cursor}
-              selected={selectedDate}
-              isBookable={(date) => isBookableDate(date, today)}
-              onSelect={handleSelectDate}
-              canPrev={!sameMonth(cursor, minCursor)}
-              canNext={!sameMonth(cursor, maxCursor)}
-              onPrev={() => setCursorOverride(shiftMonth(cursor, -1))}
-              onNext={() => setCursorOverride(shiftMonth(cursor, 1))}
-            />
+            <h2 className="mb-4 text-sm font-bold text-foreground">Selecciona la fecha</h2>
+            {dates.length === 0 ? (
+              <p className="text-sm text-muted-foreground" data-testid="no-slots">
+                No hay horarios abiertos en las próximas cuatro semanas. Escríbenos por
+                WhatsApp y buscamos una opción.
+              </p>
+            ) : (
+              <MonthCalendar
+                cursor={cursor}
+                selected={selectedDate}
+                isBookable={(date) => slotsByDate.has(date)}
+                onSelect={(date) => {
+                  setSelectedDate(date);
+                  setSelectedSlot(null);
+                }}
+                canPrev={!sameMonth(cursor, minCursor)}
+                canNext={!sameMonth(cursor, maxCursor)}
+                onPrev={() => setCursorOverride(shiftMonth(cursor, -1))}
+                onNext={() => setCursorOverride(shiftMonth(cursor, 1))}
+              />
+            )}
             <p className="mt-3 text-xs text-muted-foreground">
-              Atención de lunes a viernes. Horarios en hora de Colombia
-              (GMT-5).
+              Sesiones de lunes a jueves a las 6:00 p. m., hora de Colombia. Si necesitas
+              otro horario, escríbenos.
             </p>
           </CardContent>
         </Card>
 
-        {/* Time slots */}
         <Card>
           <CardContent>
-            <h2 className="mb-1 text-sm font-bold text-foreground">
-              Selecciona la hora
-            </h2>
+            <h2 className="mb-1 text-sm font-bold text-foreground">Selecciona la hora</h2>
             <p className="mb-3 min-h-4 text-xs text-muted-foreground">
-              {selectedDate
-                ? formatLongDate(selectedDate)
-                : "Elige primero una fecha."}
+              {selectedDate ? formatLongDate(selectedDate) : "Elige primero una fecha."}
             </p>
-            <div className="flex flex-col gap-2">
-              {SLOT_TIMES.map((t) => {
-                const yours =
-                  selectedDate !== null &&
-                  findBooking(agenda, selectedDate, t) !== undefined;
-                const blocked = !yours && blockedForDate.includes(t);
-                const isSelected = selectedTime === t;
-                const base = cn(
-                  "flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm font-semibold transition-colors",
-                  FOCUS_RING,
-                );
-                if (yours) {
-                  return (
-                    <div
-                      key={t}
-                      className={cn(
-                        base,
-                        "border-violet-200 bg-violet-100 text-violet-700",
-                      )}
-                    >
-                      {formatSlotLabel(t)}
-                      <span className="text-xs font-bold">Tu cita</span>
-                    </div>
-                  );
-                }
+            <div className="flex flex-col gap-2" data-testid="slot-list">
+              {daySlots.map((s) => {
+                const start = new Date(s.startsAt);
+                const isSelected = selectedSlot?.startsAt === s.startsAt;
                 return (
                   <button
-                    key={t}
+                    key={s.startsAt}
                     type="button"
-                    disabled={!selectedDate || blocked}
                     aria-pressed={isSelected}
-                    onClick={() => setSelectedTime(t)}
+                    onClick={() => setSelectedSlot(s)}
                     className={cn(
-                      base,
+                      "flex w-full flex-col items-start rounded-lg border px-3 py-2 text-sm font-semibold transition-colors",
+                      FOCUS_RING,
                       isSelected
                         ? "border-brand-ink bg-brand-ink text-white"
-                        : blocked
-                          ? "border-neutral-100 bg-neutral-100 text-neutral-500"
-                          : selectedDate
-                            ? "border-neutral-200 bg-card text-foreground hover:border-orange-300 hover:bg-orange-50"
-                            : "border-neutral-100 text-neutral-300",
+                        : "border-neutral-200 bg-card text-foreground hover:border-orange-300 hover:bg-orange-50",
                     )}
                   >
-                    {formatSlotLabel(t)}
-                    {blocked && <span className="text-xs">Reservado</span>}
+                    <span>{formatTimeInZone(start, BOGOTA)} Colombia</span>
+                    {timeZone !== BOGOTA && (
+                      <span className="text-xs font-normal opacity-80">
+                        {formatInZone(start, timeZone)} en tu zona
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -432,9 +349,8 @@ export function AgendaFlow() {
         </Card>
       </div>
 
-      {/* Summary bar: price + name + WhatsApp handoff (kit's footer bar). */}
       <Card className="mt-5">
-        <CardContent className="flex flex-wrap items-end gap-x-8 gap-y-4">
+        <CardContent className="grid gap-5 md:grid-cols-[auto_1fr_1fr_1fr]">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Precio
@@ -443,50 +359,86 @@ export function AgendaFlow() {
               {formatCOP(consultation.price)}
             </p>
             <p className="text-xs text-muted-foreground">
-              El pago se coordina por WhatsApp.
+              Pago por transferencia. Lili te envía los datos.
             </p>
           </div>
 
-          <div className="min-w-56 flex-1">
+          <div>
             <Label htmlFor="booking-name">Tu nombre</Label>
             <Input
               id="booking-name"
+              name="customerName"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="¿Cómo te llamas?"
               autoComplete="name"
               maxLength={80}
+              required
               className="mt-2"
             />
           </div>
 
-          <div className="flex flex-col items-start gap-2">
-            <p className="text-sm text-muted-foreground" aria-live="polite">
-              {selectedDate && selectedTime
-                ? `${formatLongDate(selectedDate)} · ${formatSlotLabel(selectedTime)}${
-                    ready ? "" : " — cuéntanos tu nombre para continuar"
-                  }`
-                : "Elige fecha, hora y cuéntanos tu nombre."}
-            </p>
-            {ready ? (
-              <Button asChild size="lg">
-                <a
-                  href={confirmHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={handleConfirm}
-                >
-                  <MessageCircle className="size-5" aria-hidden />
-                  Confirmar por WhatsApp
-                </a>
-              </Button>
-            ) : (
-              <Button size="lg" disabled>
-                <MessageCircle className="size-5" aria-hidden />
-                Confirmar por WhatsApp
-              </Button>
-            )}
+          <div>
+            <fieldset className="mb-2">
+              <legend className="text-sm font-medium text-foreground">
+                ¿Cómo te contactamos?
+              </legend>
+              <div className="mt-1 flex gap-4 text-sm">
+                {(["whatsapp", "email"] as const).map((c) => (
+                  <label key={c} className="flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name="contactChannel"
+                      value={c}
+                      checked={channel === c}
+                      onChange={() => setChannel(c)}
+                      className={cn("accent-orange-700", FOCUS_RING)}
+                    />
+                    {c === "whatsapp" ? "WhatsApp" : "Correo"}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <Input
+              name="contactValue"
+              aria-label={channel === "whatsapp" ? "Tu número de WhatsApp" : "Tu correo"}
+              value={contact}
+              onChange={(e) => setContact(e.target.value)}
+              placeholder={channel === "whatsapp" ? "+57 300 000 0000" : "tu@correo.com"}
+              type={channel === "email" ? "email" : "tel"}
+              autoComplete={channel === "email" ? "email" : "tel"}
+              inputMode={channel === "email" ? "email" : "tel"}
+              maxLength={120}
+              required
+            />
           </div>
+
+          <TimeZoneSelect id="booking-tz" value={timeZone} onChange={setTimeZoneOverride} />
+        </CardContent>
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 border-t border-neutral-100 pt-5">
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            {selectedSlot ? (
+              <>
+                {formatInZone(new Date(selectedSlot.startsAt), BOGOTA)} (Colombia)
+                {timeZone !== BOGOTA && (
+                  <>
+                    {" · "}
+                    {formatInZone(new Date(selectedSlot.startsAt), timeZone)} ({timeZone})
+                  </>
+                )}
+              </>
+            ) : (
+              "Elige fecha y hora."
+            )}
+            {state.status === "error" && (
+              <span className="mt-1 block font-semibold text-red-700" role="alert" data-testid="booking-error">
+                {state.message}
+              </span>
+            )}
+          </p>
+          <Button size="lg" type="submit" disabled={!ready || pending}>
+            {pending ? "Reservando…" : "Reservar este horario"}
+          </Button>
         </CardContent>
       </Card>
 
@@ -505,6 +457,6 @@ export function AgendaFlow() {
         </a>
         .
       </p>
-    </div>
+    </form>
   );
 }
