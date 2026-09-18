@@ -21,7 +21,7 @@ export default function AgendaPage() {
         Agenda tu sesión con Liliana Tobón
       </h1>
       <p className="mt-2 text-muted-foreground">
-        Elige modalidad, fecha y hora para tu consulta. Te confirmamos por
+        Elige tu sesión, la fecha y la hora. Te confirmamos por
         WhatsApp.
       </p>
       <Suspense fallback={<AgendaSkeleton />}>
