@@ -6,16 +6,17 @@ The Alta Vibración site: Liliana Tobón's online numerology practice (Spanish, 
 
 Live at <https://alta-vibracion-web.vercel.app>.
 
-## Status (2026-09-17)
+## Status (2026-09-18)
 
 Shipped: the marketing home (hero, why numerology, about Liliana, consultations grid), legal pages, contact page, SEO, Vercel analytics with conversion events, WCAG 2.2 AA pass.
 
 Following `../Alta_Vibracion_729_Plan_Ejecucion_V1.md` section 11:
 
 - Catalog = the plan's three services (Mi Mapa 729, Mi siguiente paso 729, Regala Mi Mapa 729). `lib/consultations.ts`.
-- Agenda on Postgres (Neon in production). Weekly rules plus per-date exceptions, 24-hour holds, public booking code with a status page, admin page to confirm payments. Decision in [`docs/adr/2026-09-17-agenda-postgres.md`](docs/adr/2026-09-17-agenda-postgres.md); setup in [`docs/agenda-setup.md`](docs/agenda-setup.md). Without `DATABASE_URL` the agenda falls back to WhatsApp.
+- Agenda on Postgres, live in production on Neon since 2026-09-18. Weekly rules (Monday–Thursday 18:00 Bogotá) plus per-date exceptions, 24-hour holds, public booking code with a status page, `/admin` to confirm payments. Decision in [`docs/adr/2026-09-17-agenda-postgres.md`](docs/adr/2026-09-17-agenda-postgres.md); setup and operations in [`docs/agenda-setup.md`](docs/agenda-setup.md). Without `DATABASE_URL` the agenda falls back to WhatsApp.
+- Not built yet: payment gateway, gift codes (REG-01 sells via WhatsApp), day-14 follow-up task, notifications beyond the WhatsApp handoff.
 
-Before public launch: fill the `[POR CONFIRMAR]` markers in `content/terms.md` and `content/privacy.md` and get them reviewed, set `NEXT_PUBLIC_SITE_URL` to the real host, add an OpenGraph image.
+Before public launch: fill the 19 `[POR CONFIRMAR]` markers in `content/terms.md` and `content/privacy.md` and get them reviewed (one names the fields the agenda stores), define gift conditions before REG-01 becomes bookable, set `NEXT_PUBLIC_SITE_URL` to the real host, add an OpenGraph image.
 
 ## Stack
 

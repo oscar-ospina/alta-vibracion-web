@@ -23,7 +23,15 @@ npm run build && npm run test:e2e   # Playwright, two servers from one build
 
 The E2E suite and the DB tests truncate the tables they touch. Both refuse to run when `DATABASE_URL` points at a managed host (Neon, Vercel, Supabase, AWS) unless `ALLOW_DESTRUCTIVE_TESTS=1` is set. Keep them on the local container.
 
-## Production (Neon + Vercel), once
+## Production (Neon + Vercel)
+
+Done on 2026-09-18: Vercel team `saas-alta`, project `alta-vibracion-web`, Neon resource `neon-chestnut-marble`, migrations `0000` and `0001` applied, seed done. What follows is the record of how, for the next database or a rebuild.
+
+### Vercel CLI login
+
+The project lives in the Vercel team `saas-alta`, which belongs to the GitHub-linked account (`oscar-4086`). Logging in with the plain email account shows "No teams available" and `vercel integration add` fails with "Team not found". Use `vercel login` → Continue with GitHub, then `vercel link --scope saas-alta`.
+
+### Steps
 
 1. In Vercel, add the Neon integration from the Marketplace to this project. It creates the database and sets `DATABASE_URL` on the project. Use the pooled connection string (host ends in `-pooler`); Neon's integration sets that by default. Check the value in Project → Settings → Environment Variables. TLS comes from the `sslmode` parameter in that string; the app passes no separate SSL option.
 2. Add `ADMIN_USER`, `ADMIN_PASSWORD` and optionally `BOOKING_HOLD_HOURS` in the same place.
@@ -34,7 +42,35 @@ npm run db:migrate
 npm run db:seed
 ```
 
-4. Redeploy. Until step 1 is done, `/agenda` shows the WhatsApp fallback and nothing else changes.
+4. Redeploy so the functions pick up the new variables:
+
+```bash
+vercel ls --prod                                   # copy the current production URL
+vercel redeploy <that-url> --target production --non-interactive
+```
+
+Until step 1 is done, `/agenda` shows the WhatsApp fallback and nothing else changes.
+
+### Pulling production variables
+
+```bash
+vercel env pull /tmp/prod.env --environment=production --yes
+```
+
+Pull to a scratch file, not to `.env.local`, or it replaces the local Docker `DATABASE_URL`. `ADMIN_USER` and `ADMIN_PASSWORD` are stored as sensitive, so the pulled file carries the placeholder `[SENSITIVE]` instead of the value; only the person who typed them can test `/admin`. Delete the scratch file afterwards.
+
+### Applying a new migration to production
+
+```bash
+export DATABASE_URL="$(grep ^DATABASE_URL= /tmp/prod.env | cut -d= -f2- | tr -d '"')"
+npm run db:migrate
+```
+
+`drizzle-kit migrate` only applies files not yet recorded in `drizzle.__drizzle_migrations`, so re-running it is safe.
+
+### Day to day
+
+Liliana opens `/admin` (Basic auth), confirms a booking after seeing the transfer, or cancels it. She closes days or adds an extra slot in the exceptions form. Confirmed sessions she copies to her own calendar by hand.
 
 ## Changing the schema
 
