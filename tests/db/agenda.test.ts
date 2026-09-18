@@ -14,9 +14,19 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is required for tests/db");
 }
 
+
+/** Never truncate a managed database by accident. */
+function assertDisposableDatabase() {
+  const url = process.env.DATABASE_URL ?? "";
+  if (/neon\.tech|vercel|supabase|amazonaws/i.test(url) && process.env.ALLOW_DESTRUCTIVE_TESTS !== "1") {
+    throw new Error("Refusing to truncate a managed database. Point DATABASE_URL at a local container.");
+  }
+}
+
 const db = getDb();
 
 async function reset() {
+  assertDisposableDatabase();
   await db.execute(sql`truncate table bookings, availability_overrides`);
   await db.execute(sql`truncate table availability_rules restart identity`);
   await db.insert(schema.availabilityRules).values(
@@ -82,22 +92,59 @@ describe("computeSlots", () => {
 
   it("hides slots held or confirmed, but not expired or cancelled ones", () => {
     const at = (d: string) => bogotaInstant(d, "18:00");
+    const end = (d: string) => bogotaInstant(d, "20:15");
     const past = new Date(now.getTime() - 1000);
     const future = new Date(now.getTime() + 1000);
     const slots = computeSlots({
       rules,
       overrides: [],
       bookings: [
-        { startsAt: at("2026-09-21"), status: "confirmed", holdExpiresAt: past },
-        { startsAt: at("2026-09-22"), status: "pending_payment", holdExpiresAt: future },
-        { startsAt: at("2026-09-23"), status: "pending_payment", holdExpiresAt: past },
-        { startsAt: at("2026-09-24"), status: "cancelled", holdExpiresAt: past },
+        { startsAt: at("2026-09-21"), endsAt: end("2026-09-21"), status: "confirmed", holdExpiresAt: past },
+        { startsAt: at("2026-09-22"), endsAt: end("2026-09-22"), status: "pending_payment", holdExpiresAt: future },
+        { startsAt: at("2026-09-23"), endsAt: end("2026-09-23"), status: "pending_payment", holdExpiresAt: past },
+        { startsAt: at("2026-09-24"), endsAt: end("2026-09-24"), status: "cancelled", holdExpiresAt: past },
       ],
       from: "2026-09-21",
       to: "2026-09-27",
       now,
     });
     assert.deepEqual(slots.map((s) => s.date), ["2026-09-23", "2026-09-24"]);
+  });
+});
+
+describe("computeSlots overlap", () => {
+  const now = new Date("2026-09-17T15:00:00Z");
+  const rules = [{ weekday: 1, time: "18:00", durationMinutes: 135, active: true }];
+
+  it("drops an extra slot that overlaps a regular one the same day", () => {
+    const slots = computeSlots({
+      rules,
+      overrides: [{ date: "2026-09-21", kind: "extra", time: "19:00", durationMinutes: 135 }],
+      bookings: [],
+      from: "2026-09-21",
+      to: "2026-09-21",
+      now,
+    });
+    assert.deepEqual(slots.map((s) => s.time), ["18:00"]);
+  });
+
+  it("hides a slot that overlaps a live booking with a different start", () => {
+    const slots = computeSlots({
+      rules,
+      overrides: [{ date: "2026-09-21", kind: "extra", time: "14:00", durationMinutes: 135 }],
+      bookings: [
+        {
+          startsAt: bogotaInstant("2026-09-21", "17:00"),
+          endsAt: bogotaInstant("2026-09-21", "18:30"),
+          status: "confirmed",
+          holdExpiresAt: now,
+        },
+      ],
+      from: "2026-09-21",
+      to: "2026-09-21",
+      now,
+    });
+    assert.deepEqual(slots.map((s) => s.time), ["14:00"]);
   });
 });
 
@@ -142,6 +189,37 @@ describe("createBooking", () => {
     assert.equal(winners.length, 1);
     assert.equal(losers.length, 1);
     assert.ok(!losers[0].ok && losers[0].error === "slot_taken");
+  });
+
+  it("caps live holds per contact", async () => {
+    const slots = await loadAvailability();
+    const a = await createBooking(input(slots[0].startsAt));
+    const b = await createBooking(input(slots[1].startsAt));
+    const c = await createBooking(input(slots[2].startsAt));
+    assert.ok(a.ok && b.ok);
+    assert.deepEqual(c, { ok: false, error: "too_many" });
+  });
+
+  it("the database rejects an overlapping booking even with a different start", async () => {
+    const [slot] = await loadAvailability();
+    const first = await createBooking(input(slot.startsAt));
+    assert.ok(first.ok);
+    const start = new Date(new Date(slot.startsAt).getTime() + 30 * 60_000);
+    await assert.rejects(
+      db.insert(schema.bookings).values({
+        code: "AV-TESTXX",
+        serviceId: "yo-01",
+        priceCop: 1,
+        startsAt: start,
+        endsAt: new Date(start.getTime() + 60 * 60_000),
+        holdExpiresAt: new Date(Date.now() + 3_600_000),
+        customerName: "X",
+        contactChannel: "email",
+        contactValue: "x@example.com",
+        clientTimeZone: "America/Bogota",
+      }),
+      (err: unknown) => /bookings_no_overlap/.test(String((err as Error).cause ?? err)),
+    );
   });
 
   it("frees the slot once the hold expires, and sweeps the old row", async () => {

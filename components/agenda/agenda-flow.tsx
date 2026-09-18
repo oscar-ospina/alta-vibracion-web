@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { track } from "@vercel/analytics";
 import { BadgeCheck, MapPin, MessageCircle } from "lucide-react";
 import {
@@ -90,6 +90,7 @@ function buildHandoffMessage(args: {
 }
 
 export function AgendaFlow({ slots, holdHours }: { slots: Slot[]; holdHours: number }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const consultationParam = searchParams.get("consultation");
   const origin = searchParams.get("origen") ?? "";
@@ -126,7 +127,9 @@ export function AgendaFlow({ slots, holdHours }: { slots: Slot[]; holdHours: num
     if (state.status === "created") {
       track("booking_created", { service: state.serviceId, origin: origin || "direct" });
     }
-  }, [state, origin]);
+    // A conflict means our slot list is stale: ask the server for a fresh one.
+    if (state.status === "error") router.refresh();
+  }, [state, origin, router]);
 
   if (state.status === "created") {
     const startsAt = new Date(state.startsAt);

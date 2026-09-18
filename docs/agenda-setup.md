@@ -21,11 +21,11 @@ npm run test                        # node:test against the local database
 npm run build && npm run test:e2e   # Playwright, two servers from one build
 ```
 
-The E2E suite truncates the tables it touches. Point `DATABASE_URL` at a throwaway database, never at production.
+The E2E suite and the DB tests truncate the tables they touch. Both refuse to run when `DATABASE_URL` points at a managed host (Neon, Vercel, Supabase, AWS) unless `ALLOW_DESTRUCTIVE_TESTS=1` is set. Keep them on the local container.
 
 ## Production (Neon + Vercel), once
 
-1. In Vercel, add the Neon integration from the Marketplace to this project. It creates the database and sets `DATABASE_URL` on the project. Use the pooled connection string (host ends in `-pooler`); Neon's integration sets that by default. Check the value in Project → Settings → Environment Variables.
+1. In Vercel, add the Neon integration from the Marketplace to this project. It creates the database and sets `DATABASE_URL` on the project. Use the pooled connection string (host ends in `-pooler`); Neon's integration sets that by default. Check the value in Project → Settings → Environment Variables. TLS comes from the `sslmode` parameter in that string; the app passes no separate SSL option.
 2. Add `ADMIN_USER`, `ADMIN_PASSWORD` and optionally `BOOKING_HOLD_HOURS` in the same place.
 3. From a machine with that `DATABASE_URL` exported:
 

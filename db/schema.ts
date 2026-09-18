@@ -95,6 +95,8 @@ export const bookings = pgTable(
     uniqueIndex("bookings_code_idx").on(t.code),
     index("bookings_starts_at_idx").on(t.startsAt),
     // The double-booking guard. Only statuses that block a slot take part.
+    // drizzle/0001_no_overlap.sql adds the matching EXCLUDE constraint on
+    // tstzrange(starts_at, ends_at) so overlapping slots can't coexist either.
     uniqueIndex("bookings_active_slot_idx")
       .on(t.startsAt)
       .where(sql`${t.status} in ('pending_payment', 'confirmed')`),

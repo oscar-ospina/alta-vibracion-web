@@ -77,6 +77,7 @@ export async function submitBooking(
       slot_taken: "Ese horario se acaba de ocupar. Elige otro, por favor.",
       unavailable: "Ese horario ya no está disponible. Elige otro, por favor.",
       invalid_service: "Elige una sesión válida.",
+      too_many: "Ya tienes reservas pendientes de pago con ese contacto. Escríbenos por WhatsApp para completarlas.",
     } as const;
     return { status: "error", message: messages[result.error] };
   }

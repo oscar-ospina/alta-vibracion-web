@@ -5,7 +5,7 @@
  * real guard; a 23505 here means someone else won the slot a moment earlier.
  */
 import { randomBytes } from "node:crypto";
-import { and, eq, gte, lt, sql } from "drizzle-orm";
+import { and, count, eq, gt, gte, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import type { Booking } from "@/db/schema";
 import { findConsultation } from "@/lib/consultations";
@@ -38,7 +38,10 @@ export type CreateBookingInput = {
 
 export type CreateBookingResult =
   | { ok: true; booking: Booking }
-  | { ok: false; error: "slot_taken" | "unavailable" | "invalid_service" };
+  | { ok: false; error: "slot_taken" | "unavailable" | "invalid_service" | "too_many" };
+
+/** Live holds one contact may have at once. Keeps a script from squatting the calendar. */
+export const MAX_PENDING_PER_CONTACT = 2;
 
 /** Marks pending holds past their expiry so the unique index lets the slot go. */
 export async function sweepExpiredHolds(
@@ -51,7 +54,7 @@ export async function sweepExpiredHolds(
     .where(
       and(
         eq(schema.bookings.status, "pending_payment"),
-        lt(schema.bookings.holdExpiresAt, now),
+        lte(schema.bookings.holdExpiresAt, now),
       ),
     );
 }
@@ -84,6 +87,18 @@ export async function createBooking(
   const holdExpiresAt = addMinutes(now, holdHours() * 60);
   const db = getDb();
 
+  const [{ pending }] = await db
+    .select({ pending: count() })
+    .from(schema.bookings)
+    .where(
+      and(
+        eq(schema.bookings.contactValue, input.contactValue),
+        eq(schema.bookings.status, "pending_payment"),
+        gt(schema.bookings.holdExpiresAt, now),
+      ),
+    );
+  if (pending >= MAX_PENDING_PER_CONTACT) return { ok: false, error: "too_many" };
+
   for (let attempt = 0; attempt < 3; attempt++) {
     const code = generateBookingCode();
     try {
@@ -112,7 +127,8 @@ export async function createBooking(
       return { ok: true, booking };
     } catch (err) {
       const pgErr = unwrapPgError(err);
-      if (pgErr?.code !== "23505") throw err;
+      // 23505 = unique (same start), 23P01 = exclusion (overlapping range).
+      if (pgErr?.code !== "23505" && pgErr?.code !== "23P01") throw err;
       if (pgErr.constraint === "bookings_code_idx") continue; // retry with a new code
       return { ok: false, error: "slot_taken" };
     }
@@ -191,7 +207,8 @@ export async function setBookingStatus(
     if (!row) return { ok: false, error: "not_pending" };
     return { ok: true, booking: row };
   } catch (err) {
-    if (unwrapPgError(err)?.code === "23505") return { ok: false, error: "slot_taken" };
+    const code = unwrapPgError(err)?.code;
+    if (code === "23505" || code === "23P01") return { ok: false, error: "slot_taken" };
     throw err;
   }
 }

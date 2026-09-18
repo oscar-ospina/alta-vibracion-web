@@ -5,6 +5,7 @@ import { Button, Card, CardContent } from "@saas/ui";
 import { hasDatabase } from "@/db/client";
 import { effectiveStatus, findBookingByCode } from "@/lib/agenda/bookings";
 import { BOGOTA, formatInZone } from "@/lib/agenda/time";
+import { STATUS_LABEL } from "@/lib/agenda/labels";
 import { findConsultation, formatCOP } from "@/lib/consultations";
 import { whatsappUrl } from "@/lib/site";
 
@@ -15,25 +16,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const STATUS_LABEL: Record<string, { label: string; hint: string }> = {
-  pending_payment: {
-    label: "Pendiente de pago",
-    hint: "Tu horario está reservado mientras Liliana verifica el pago. Si aún no le has escrito, envíale tu código por WhatsApp.",
-  },
-  confirmed: {
-    label: "Confirmada",
-    hint: "Liliana verificó el pago. Recibirás el enlace de Google Meet y el formulario previo por el canal que elegiste.",
-  },
-  cancelled: {
-    label: "Cancelada",
-    hint: "Esta reserva fue cancelada. Si quieres otra fecha, escríbenos.",
-  },
-  expired: {
-    label: "Vencida",
-    hint: "El plazo para el pago terminó y el horario volvió a quedar libre. Puedes reservar de nuevo.",
-  },
-};
-
 /** Public status page. The code is the only key; it carries no personal data. */
 export default async function BookingStatusPage({
   params,
@@ -42,7 +24,10 @@ export default async function BookingStatusPage({
 }) {
   if (!hasDatabase()) notFound();
   const { code } = await params;
-  const booking = await findBookingByCode(code);
+  const booking = await findBookingByCode(code).catch((err) => {
+    console.error("agenda: status lookup failed", err);
+    return null;
+  });
   if (!booking) notFound();
 
   const status = effectiveStatus(booking);

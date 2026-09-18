@@ -36,7 +36,7 @@ export function bookableWindow(today: ISODate = todayInBogota()) {
   return { from: addDays(today, LEAD_DAYS), to: addDays(today, HORIZON_DAYS) };
 }
 
-type BlockedBooking = Pick<Booking, "startsAt" | "status" | "holdExpiresAt">;
+type BlockedBooking = Pick<Booking, "startsAt" | "endsAt" | "status" | "holdExpiresAt">;
 
 export function blocksSlot(b: BlockedBooking, now: Date): boolean {
   if (b.status === "confirmed") return true;
@@ -52,11 +52,13 @@ export function computeSlots(args: {
   to: ISODate;
   now: Date;
 }): Slot[] {
-  const blocked = new Set(
-    args.bookings
-      .filter((b) => blocksSlot(b, args.now))
-      .map((b) => b.startsAt.getTime()),
-  );
+  // A slot is taken when it overlaps ANY live booking, not only one with the
+  // same start (an extra slot may sit inside a regular one).
+  const busy = args.bookings
+    .filter((b) => blocksSlot(b, args.now))
+    .map((b) => [b.startsAt.getTime(), b.endsAt.getTime()] as const);
+  const overlapsBusy = (start: number, end: number) =>
+    busy.some(([bs, be]) => start < be && end > bs);
   const overridesByDate = new Map<ISODate, typeof args.overrides>();
   for (const o of args.overrides) {
     const list = overridesByDate.get(o.date) ?? [];
@@ -77,13 +79,17 @@ export function computeSlots(args: {
       if (r.active && r.weekday === weekday) candidates.set(r.time, r.durationMinutes);
     }
     for (const o of dayOverrides) {
-      if (o.kind === "extra" && o.time) candidates.set(o.time, o.durationMinutes ?? 75);
+      if (o.kind === "extra" && o.time) candidates.set(o.time, o.durationMinutes ?? 135);
     }
+    let lastEnd = 0;
     for (const [time, durationMinutes] of [...candidates].sort()) {
       if (closedTimes.has(time)) continue;
       const start = bogotaInstant(date, time);
+      // Two candidates on the same day must not overlap; the earlier one wins.
+      if (start.getTime() < lastEnd) continue;
+      lastEnd = start.getTime() + durationMinutes * 60_000;
       if (start.getTime() <= args.now.getTime()) continue;
-      if (blocked.has(start.getTime())) continue;
+      if (overlapsBusy(start.getTime(), start.getTime() + durationMinutes * 60_000)) continue;
       slots.push({ date, time, durationMinutes, startsAt: start.toISOString() });
     }
   }
@@ -108,6 +114,7 @@ export async function loadAvailability(now: Date = new Date()): Promise<Slot[]> 
     db
       .select({
         startsAt: schema.bookings.startsAt,
+        endsAt: schema.bookings.endsAt,
         status: schema.bookings.status,
         holdExpiresAt: schema.bookings.holdExpiresAt,
       })

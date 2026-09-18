@@ -5,6 +5,7 @@ import { getDb, hasDatabase, schema } from "@/db/client";
 import { effectiveStatus, listUpcomingBookings } from "@/lib/agenda/bookings";
 import { BOGOTA, formatInZone, formatLongDate, todayInBogota } from "@/lib/agenda/time";
 import { findConsultation, formatCOP } from "@/lib/consultations";
+import { ADMIN_NOTICE, STATUS_LABEL, type AdminNoticeKey } from "@/lib/agenda/labels";
 import { addOverride, cancelBooking, confirmBooking, deleteOverride } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -12,13 +13,6 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Administración de agenda",
   robots: { index: false, follow: false },
-};
-
-const STATUS: Record<string, string> = {
-  pending_payment: "Pendiente de pago",
-  confirmed: "Confirmada",
-  cancelled: "Cancelada",
-  expired: "Vencida",
 };
 
 const FOCUS_RING =
@@ -35,6 +29,7 @@ export default async function AdminPage({
   searchParams: Promise<{ aviso?: string }>;
 }) {
   const { aviso } = await searchParams;
+  const notice = aviso && aviso in ADMIN_NOTICE ? ADMIN_NOTICE[aviso as AdminNoticeKey] : null;
   if (!hasDatabase()) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-10">
@@ -43,14 +38,25 @@ export default async function AdminPage({
     );
   }
   const now = new Date();
-  const [bookings, overrides] = await Promise.all([
+  let bookings: Awaited<ReturnType<typeof listUpcomingBookings>> = [];
+  let overrides: (typeof schema.availabilityOverrides.$inferSelect)[] = [];
+  try {
+    [bookings, overrides] = await Promise.all([
     listUpcomingBookings(now),
     getDb()
       .select()
       .from(schema.availabilityOverrides)
       .where(gte(schema.availabilityOverrides.date, todayInBogota(now)))
       .orderBy(schema.availabilityOverrides.date),
-  ]);
+    ]);
+  } catch (err) {
+    console.error("admin: database unavailable", err);
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-10">
+        <p>No se pudo consultar la base de datos. Revisa DATABASE_URL y las migraciones.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-10">
@@ -60,9 +66,9 @@ export default async function AdminPage({
         se muestran en hora de Colombia.
       </p>
 
-      {aviso && (
+      {notice && (
         <p role="alert" data-testid="admin-notice" className="mt-4 rounded-lg bg-orange-50 px-4 py-3 text-sm font-semibold text-brand-ink">
-          {aviso}
+          {notice}
         </p>
       )}
 
@@ -105,7 +111,7 @@ export default async function AdminPage({
                       <span className="block text-xs text-muted-foreground">{b.contactChannel}</span>
                     </td>
                     <td className="py-2 pr-3 font-semibold" data-testid="admin-status">
-                      {STATUS[status]}
+                      {STATUS_LABEL[status].label}
                     </td>
                     <td className="py-2">
                       {status === "pending_payment" && (

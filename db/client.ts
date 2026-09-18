@@ -20,14 +20,9 @@ export function getDb(): Db {
   if (db) return db;
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
-  const pool = new Pool({
-    connectionString: url,
-    max: 3,
-    // Neon requires TLS; the local container does not offer it.
-    ssl: /neon\.tech|sslmode=require/.test(url)
-      ? { rejectUnauthorized: true }
-      : undefined,
-  });
+  // TLS comes from the URL itself (Neon's string carries sslmode); pg ignores
+  // a separate ssl option when the URL sets sslmode, so none is passed here.
+  const pool = new Pool({ connectionString: url, max: 3 });
   db = drizzle(pool, { schema });
   return db;
 }

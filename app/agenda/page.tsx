@@ -23,8 +23,17 @@ export const dynamic = "force-dynamic";
  * button that asks for available times. Never simulated slots.
  */
 export default async function AgendaPage() {
-  const online = hasDatabase();
-  const slots = online ? await loadAvailability() : [];
+  let online = hasDatabase();
+  let slots: Awaited<ReturnType<typeof loadAvailability>> = [];
+  if (online) {
+    try {
+      slots = await loadAvailability();
+    } catch (err) {
+      // Unreachable or unmigrated database: degrade to the manual path.
+      console.error("agenda: availability unavailable", err);
+      online = false;
+    }
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-10">
