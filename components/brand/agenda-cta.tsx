@@ -5,6 +5,7 @@ import Link from "next/link";
 import { track } from "@vercel/analytics";
 import { Button } from "@saas/ui";
 import { ROUTES } from "@/lib/site";
+import type { ServiceId } from "@/lib/consultations";
 
 /**
  * CTA into the in-app Agenda (story oscar-ospina/saas-planner#45). Replaces the
@@ -20,7 +21,7 @@ export type AgendaSource = "hero" | "consultation";
 type AgendaCtaProps = {
   source: AgendaSource;
   /** Preselect a consultation in the flow (renders /agenda?consultation=<id>). */
-  consultationId?: number;
+  consultationId?: ServiceId;
   /** Extra event properties, e.g. the consultation name. */
   eventProps?: Record<string, string>;
   size?: ComponentProps<typeof Button>["size"];

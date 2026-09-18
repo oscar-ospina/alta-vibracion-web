@@ -20,8 +20,9 @@ import {
   cn,
 } from "@saas/ui";
 import {
-  CONSULTATIONS,
+  BOOKABLE_CONSULTATIONS,
   type Consultation,
+  findConsultation,
   formatCOP,
 } from "@/lib/consultations";
 import { whatsappUrl } from "@/lib/site";
@@ -87,11 +88,6 @@ function useIsHydrated(): boolean {
   );
 }
 
-const MODALITIES: { value: Modality; label: string }[] = [
-  { value: "presencial", label: "Presencial" },
-  { value: "virtual", label: "Virtual" },
-];
-
 export function AgendaSkeleton() {
   return (
     <div aria-busy="true" className="mt-8">
@@ -128,12 +124,11 @@ export function AgendaFlow() {
   );
 
   // Preselect from /agenda?consultation=<id> (the grid's CTAs).
-  const [consultation, setConsultation] = useState<Consultation>(
-    () =>
-      CONSULTATIONS.find((c) => String(c.id) === consultationParam) ??
-      CONSULTATIONS[0],
-  );
-  const [modality, setModality] = useState<Modality>("presencial");
+  const [consultation, setConsultation] = useState<Consultation>(() => {
+    const found = findConsultation(consultationParam);
+    return found?.bookable ? found : BOOKABLE_CONSULTATIONS[0];
+  });
+  const modality: Modality = "virtual";
   // null = "no user override yet" → derived defaults below.
   const [cursorOverride, setCursorOverride] = useState<MonthCursor | null>(
     null,
@@ -311,10 +306,10 @@ export function AgendaFlow() {
                 Consulta
               </Label>
               <Select
-                value={String(consultation.id)}
+                value={consultation.id}
                 onValueChange={(v) => {
-                  const found = CONSULTATIONS.find((c) => String(c.id) === v);
-                  if (found) setConsultation(found);
+                  const found = findConsultation(v);
+                  if (found?.bookable) setConsultation(found);
                 }}
               >
                 <SelectTrigger
@@ -324,8 +319,8 @@ export function AgendaFlow() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CONSULTATIONS.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
+                  {BOOKABLE_CONSULTATIONS.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
                       {c.name}
                     </SelectItem>
                   ))}
@@ -336,33 +331,17 @@ export function AgendaFlow() {
               </p>
             </div>
 
-            {/* Kit parity note: the kit draws 22px orange circle-dot icons over
-                a bare label (no input). We keep native radios for a11y and
-                approximate the look — stacked options, larger brand-accent
-                control, 16px labels (accepted deviation, like brand-ink). */}
-            <fieldset>
-              <legend className="text-sm font-bold text-foreground">
-                Modalidad de la sesión
-              </legend>
-              <div className="mt-2 flex flex-col gap-2">
-                {MODALITIES.map((m) => (
-                  <label
-                    key={m.value}
-                    className="flex cursor-pointer items-center gap-2.5 text-base text-foreground"
-                  >
-                    <input
-                      type="radio"
-                      name="modality"
-                      value={m.value}
-                      checked={modality === m.value}
-                      onChange={() => setModality(m.value)}
-                      className={cn("size-5 accent-orange-700", FOCUS_RING)}
-                    />
-                    {m.label}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
+            <div>
+              <p className="text-sm font-bold text-foreground">Modalidad</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Virtual, por Google Meet. {consultation.durationMinutes} minutos.
+              </p>
+              {consultation.requiresPreviousSession && (
+                <p className="mt-2 rounded-lg bg-orange-50 px-3 py-2 text-xs text-brand-ink">
+                  Solo para quienes ya tuvieron su primera sesión.
+                </p>
+              )}
+            </div>
           </CardContent>
         </Card>
 

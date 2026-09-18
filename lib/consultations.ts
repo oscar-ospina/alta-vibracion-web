@@ -1,60 +1,99 @@
 /**
- * Consultations catalog (story oscar-ospina/saas-planner#25). Static config so the
- * grid reflects new citas/prices/modality by editing this data only — no component
- * changes (CMS deferred; the typed array is a drop-in seam for a future fetcher).
- * Source of truth mirrors the kit's `CITAS` (components.jsx).
+ * Service catalog. Source of truth: the launch plan (section 2, "Catálogo para
+ * comenzar"). Prices are launch hypotheses, not validated market prices; change
+ * them here only when Liliana confirms.
+ *
+ * `bookable` decides whether the card sends the visitor into /agenda or to
+ * WhatsApp. The gift (REG-01) is not bookable: the recipient books their own
+ * session later, and gift conditions are still being defined.
  */
+export type ServiceId = "yo-01" | "yo-02" | "reg-01";
+
 export type Consultation = {
-  id: number;
-  /** Display name, e.g. "Numerología Esencial". */
+  id: ServiceId;
+  /** Catalog code as printed in the plan, e.g. "YO-01". */
+  code: string;
   name: string;
-  /** Short violet theme tag, e.g. "Autoconocimiento y Destino". */
+  /** Short violet theme tag under the name. */
   tag: string;
-  /** Modality badge label, e.g. "Presencial / Virtual" (per-cita, data-driven). */
-  modality: string;
+  durationMinutes: number;
+  /** Commercial description (the plan's "Texto para ficha comercial"). */
   description: string;
+  /** What the price includes, one line each. */
+  includes: string[];
   /** Price in COP (integer pesos). */
   price: number;
+  /** false = the CTA goes to WhatsApp instead of the agenda. */
+  bookable: boolean;
+  /** Shown as a note on the card and enforced by Liliana on WhatsApp. */
+  requiresPreviousSession: boolean;
 };
 
 export const CONSULTATIONS: Consultation[] = [
   {
-    id: 1,
-    name: "Numerología Esencial",
-    tag: "Autoconocimiento y Destino",
-    modality: "Presencial / Virtual",
+    id: "yo-01",
+    code: "YO-01",
+    name: "Mi Mapa 729",
+    tag: "Primera sesión personal",
+    durationMinutes: 75,
     description:
-      "Descubre lo que tu nombre completo revela sobre tu misión personal. Conecta con tus anhelos más profundos.",
-    price: 150000,
+      "Una sesión personal de numerología para explorar cómo te reconoces, qué valoras y qué preguntas quieres hacerte en este momento. Conversamos a partir de tu mapa y de una inquietud que traigas.",
+    includes: [
+      "Formulario previo breve",
+      "Sesión virtual individual de 75 minutos",
+      "Resumen personalizado de 1 a 2 páginas en dos días hábiles",
+      "Tres acciones o preguntas para seguir reflexionando",
+    ],
+    price: 149900,
+    bookable: true,
+    requiresPreviousSession: false,
   },
   {
-    id: 2,
-    name: "Numerología Avanzada",
-    tag: "Caminos y Tránsitos del Alma",
-    modality: "Presencial / Virtual",
+    id: "yo-02",
+    code: "YO-02",
+    name: "Mi siguiente paso 729",
+    tag: "Continuidad",
+    durationMinutes: 60,
     description:
-      "Descubre las habilidades únicas que trajiste al nacer. Conoce los eventos importantes que marcarán tu vida.",
-    price: 161900,
+      "Un espacio para trabajar una pregunta concreta que surgió después de tu primera consulta. Elegimos un tema, lo exploramos en una sesión de 60 minutos y acordamos una práctica. Dos semanas después tendrás una revisión breve por escrito.",
+    includes: [
+      "Formulario de elección de tema",
+      "Sesión virtual de 60 minutos",
+      "Una práctica personalizada y una hoja de síntesis en dos días hábiles",
+      "Revisión escrita al día 14",
+    ],
+    price: 179900,
+    bookable: true,
+    requiresPreviousSession: true,
   },
   {
-    id: 3,
-    name: "Numerología Profunda",
-    tag: "Caminos de Evolución y Desafíos",
-    modality: "Presencial / Virtual",
+    id: "reg-01",
+    code: "REG-01",
+    name: "Regala Mi Mapa 729",
+    tag: "Regalo para un adulto",
+    durationMinutes: 75,
     description:
-      "Revelación detallada de las experiencias clave que marcan tu vida y las influencias de tu camino vital.",
-    price: 189000,
-  },
-  {
-    id: 4,
-    name: "Numerología Especializada",
-    tag: "Áreas Específicas de Vida",
-    modality: "Presencial / Virtual",
-    description:
-      "Análisis profundo enfocado: relaciones de pareja, familia, orientación profesional y más.",
-    price: 210000,
+      "Regala un espacio para conocerse. Incluye una sesión virtual individual de 75 minutos, un resumen personalizado y tres preguntas o acciones de reflexión. La persona elige cuándo reservar y qué desea explorar.",
+    includes: [
+      "Tarjeta digital con código único y tu mensaje",
+      "La persona que recibe el regalo elige su horario",
+      "Lo conversado queda entre ella y Liliana",
+    ],
+    price: 149900,
+    bookable: false,
+    requiresPreviousSession: false,
   },
 ];
+
+export const BOOKABLE_CONSULTATIONS = CONSULTATIONS.filter((c) => c.bookable);
+
+export function findConsultation(id: string | null | undefined) {
+  return CONSULTATIONS.find((c) => c.id === id);
+}
+
+/** Visible next to every price (plan, section 2). */
+export const NUMEROLOGY_DISCLAIMER =
+  "La numerología se utiliza como herramienta simbólica de reflexión. No diagnostica ni garantiza resultados o predicciones.";
 
 /** Format a COP price the Colombian way, e.g. 150000 → "COP 150.000". */
 export function formatCOP(price: number): string {
