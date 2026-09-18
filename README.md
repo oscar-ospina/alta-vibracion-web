@@ -10,10 +10,10 @@ Live at <https://alta-vibracion-web.vercel.app>.
 
 Shipped: the marketing home (hero, why numerology, about Liliana, consultations grid), legal pages, contact page, SEO, Vercel analytics with conversion events, WCAG 2.2 AA pass.
 
-In progress, following `../Alta_Vibracion_729_Plan_Ejecucion_V1.md` section 11:
+Following `../Alta_Vibracion_729_Plan_Ejecucion_V1.md` section 11:
 
-1. Catalog replaced by the plan's three services (Mi Mapa 729, Mi siguiente paso 729, Regala Mi Mapa 729).
-2. Agenda on Postgres (Neon): real availability, holds, booking codes, admin confirmation. Decision in [`docs/adr/2026-09-17-agenda-postgres.md`](docs/adr/2026-09-17-agenda-postgres.md). The Google Calendar path from June is archived in `docs/archive/adr/`.
+- Catalog = the plan's three services (Mi Mapa 729, Mi siguiente paso 729, Regala Mi Mapa 729). `lib/consultations.ts`.
+- Agenda on Postgres (Neon in production). Weekly rules plus per-date exceptions, 24-hour holds, public booking code with a status page, admin page to confirm payments. Decision in [`docs/adr/2026-09-17-agenda-postgres.md`](docs/adr/2026-09-17-agenda-postgres.md); setup in [`docs/agenda-setup.md`](docs/agenda-setup.md). Without `DATABASE_URL` the agenda falls back to WhatsApp.
 
 Before public launch: fill the `[POR CONFIRMAR]` markers in `content/terms.md` and `content/privacy.md` and get them reviewed, set `NEXT_PUBLIC_SITE_URL` to the real host, add an OpenGraph image.
 
@@ -30,21 +30,28 @@ npm run dev        # http://localhost:3000
 ```
 
 ```bash
+npm run db:migrate # apply drizzle/*.sql to DATABASE_URL
+npm run db:seed    # Monday–Thursday 18:00 rules
 npm run build      # next build
 npm run start      # serve the production build
 npm run lint
 npm run typecheck
+npm run test       # database tests (needs Postgres)
+npm run test:e2e   # Playwright against the build
 ```
 
-Node 20.9 or newer. CI runs lint, typecheck and build on every push and PR.
+Node 20.9 or newer. CI runs lint, typecheck, DB tests, build and E2E on every push and PR, with a `postgres:16` service.
 
 ## Layout
 
 ```
-app/            routes (home, agenda, contact, terms, privacy), layout, globals.css, brand.css
+app/            routes (home, agenda, agenda/[code], admin, contact, terms, privacy), server actions
 components/     brand/ (logo, CTAs), layout/ (top bar, footer, WhatsApp FAB), sections/, agenda/
 content/        terms.md, privacy.md, contact.md (read at build time)
-lib/            site.ts (contact, routes), consultations.ts (catalog), agenda.ts, legal.ts
+db/             Drizzle schema + lazy client; drizzle/ holds the SQL migrations
+lib/            site.ts, consultations.ts (catalog), agenda/ (time, availability, bookings), admin-auth
+proxy.ts        Basic-auth challenge for /admin
+tests/db, e2e/  node:test DB tests; Playwright specs
 docs/adr/       current decisions; docs/archive/adr/ superseded ones
 ```
 

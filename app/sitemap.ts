@@ -1,12 +1,7 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL, ROUTES } from "@/lib/site";
 
-/**
- * XML sitemap for crawlers (story oscar-ospina/saas-planner#22). Lists every public
- * route, absolute-resolved against SITE_URL (env-overridable per environment). Home
- * ranks highest; the legal/contact pages change rarely. Static marketing site, so
- * the route set is enumerated by hand — add new routes here as they ship.
- */
+/** XML sitemap. Public routes only; /admin and /agenda/<code> stay out. */
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
 

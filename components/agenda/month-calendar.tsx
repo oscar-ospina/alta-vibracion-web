@@ -2,17 +2,11 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@saas/ui";
-import {
-  type ISODate,
-  type MonthCursor,
-  formatLongDate,
-  monthGridDates,
-  monthLabel,
-} from "@/lib/agenda";
+import { type ISODate, formatLongDate } from "@/lib/agenda/time";
+import { type MonthCursor, monthGridDates, monthLabel } from "@/lib/agenda/calendar";
 
 /**
- * Month grid for the Agenda (story oscar-ospina/saas-planner#45), after the
- * design kit's calendar: Monday-based, bookable days get the orange tint, the
+ * Month grid for the Agenda, after the design kit's calendar: Monday-based, bookable days get the orange tint, the
  * selected day inverts. Selected uses brand-ink (orange-700) — not the kit's
  * orange-400 — so the white day number keeps WCAG AA contrast (~5.8:1).
  *
