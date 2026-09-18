@@ -7,14 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
-    "smoke:calendar": "tsx scripts/smoke-calendar.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@saas/ui": "^0.2.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
-    "googleapis": "^173.0.0",
     "lucide-react": "^1.17.0",
     "next": "16.2.7",
     "react": "^19.2.7",
