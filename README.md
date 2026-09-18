@@ -14,7 +14,8 @@ Following `../Alta_Vibracion_729_Plan_Ejecucion_V1.md` section 11:
 
 - Catalog = the plan's three services (Mi Mapa 729, Mi siguiente paso 729, Regala Mi Mapa 729). `lib/consultations.ts`.
 - Agenda on Postgres, live in production on Neon since 2026-09-18. Weekly rules (Monday–Thursday 18:00 Bogotá) plus per-date exceptions, 24-hour holds, public booking code with a status page, `/admin` to confirm payments. Decision in [`docs/adr/2026-09-17-agenda-postgres.md`](docs/adr/2026-09-17-agenda-postgres.md); setup and operations in [`docs/agenda-setup.md`](docs/agenda-setup.md). Without `DATABASE_URL` the agenda falls back to WhatsApp.
-- Not built yet: payment gateway, gift codes (REG-01 sells via WhatsApp), day-14 follow-up task, notifications beyond the WhatsApp handoff.
+- Delivery in `/admin` since 2026-09-18: per-booking page with form-received, session-attended and day-14 follow-up marks; a report editor (draft / reviewed / approved, template from the plan's section 3) whose approved text shows on the client's `/agenda/[code]` page; pending lists for forms, deliveries and follow-ups; `/admin/script` with the operating script and the seven-day plan (`content/admin/`). Decision in [`docs/adr/2026-09-18-delivery-in-admin.md`](docs/adr/2026-09-18-delivery-in-admin.md).
+- Not built yet: payment gateway, gift codes (REG-01 sells via WhatsApp), the pre-session form itself (external until the legal texts are signed; the admin records that it arrived), notifications beyond the WhatsApp handoff.
 
 Before public launch: fill the 19 `[POR CONFIRMAR]` markers in `content/terms.md` and `content/privacy.md` and get them reviewed (one names the fields the agenda stores), define gift conditions before REG-01 becomes bookable, set `NEXT_PUBLIC_SITE_URL` to the real host, add an OpenGraph image.
 
@@ -46,11 +47,11 @@ Node 20.9 or newer. CI runs lint, typecheck, DB tests, build and E2E on every pu
 ## Layout
 
 ```
-app/            routes (home, agenda, agenda/[code], admin, contact, terms, privacy), server actions
+app/            routes (home, agenda, agenda/[code], admin, admin/bookings/[id], admin/script, contact, terms, privacy), server actions
 components/     brand/ (logo, CTAs), layout/ (top bar, footer, WhatsApp FAB), sections/, agenda/
-content/        terms.md, privacy.md, contact.md (read at build time)
+content/        terms.md, privacy.md, contact.md, admin/ (script, week plan); all read at build time
 db/             Drizzle schema + lazy client; drizzle/ holds the SQL migrations
-lib/            site.ts, consultations.ts (catalog), agenda/ (time, availability, bookings), admin-auth
+lib/            site.ts, consultations.ts (catalog), agenda/ (time, availability, bookings, delivery), admin-auth
 proxy.ts        Basic-auth challenge for /admin
 tests/db, e2e/  node:test DB tests; Playwright specs
 docs/adr/       current decisions; docs/archive/adr/ superseded ones
