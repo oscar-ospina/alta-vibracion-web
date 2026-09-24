@@ -84,7 +84,7 @@ export function AgendaFlow({ slots, holdHours }: { slots: Slot[]; holdHours: num
 
   // One product sells in October (plan section 1). The `consultation` param is
   // kept for links and campaigns; anything not active falls back to YO-01.
-  const consultation = useMemo<SellableService>(() => {
+  const consultation = useMemo<SellableService | undefined>(() => {
     const found = findService(consultationParam);
     return found?.status === "active" ? found : ACTIVE_SERVICES[0];
   }, [consultationParam]);
@@ -119,6 +119,10 @@ export function AgendaFlow({ slots, holdHours }: { slots: Slot[]; holdHours: num
     // A conflict means our slot list is stale: ask the server for a fresh one.
     if (state.status === "error") router.refresh();
   }, [state, origin, router]);
+
+  // The page only renders the flow when a service is active; this keeps the
+  // component honest if that ever changes.
+  if (!consultation) return null;
 
   if (state.status === "created") {
     const startsAt = new Date(state.startsAt);

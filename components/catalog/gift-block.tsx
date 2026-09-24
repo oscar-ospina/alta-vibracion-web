@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { Gift } from "lucide-react";
-import { Button, Card, CardContent } from "@saas/ui";
+import { Card, CardContent } from "@saas/ui";
+import { GiftCta } from "@/components/brand/gift-cta";
 import { FIRST_SESSION, formatCOP } from "@/lib/catalog";
-import { ROUTES } from "@/lib/site";
 
 /**
  * "Regala Mi Mapa 729" block (plan section 7.1). Shown on /celebremos before
@@ -27,12 +26,10 @@ export function GiftBlock({ compact = false }: { compact?: boolean }) {
             Antes del pago confirmamos disponibilidad, forma de entrega y condiciones.
           </p>
         </div>
-        <Button asChild size="lg" className="justify-self-start md:justify-self-end">
-          <Link href={ROUTES.gift}>
-            <Gift className="size-5" aria-hidden />
-            Regalar una cita
-          </Link>
-        </Button>
+        <GiftCta source="gift_block" variant="default" size="lg" className="justify-self-start md:justify-self-end">
+          <Gift className="size-5" aria-hidden />
+          Regalar una cita
+        </GiftCta>
       </CardContent>
     </Card>
   );

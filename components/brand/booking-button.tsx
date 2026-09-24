@@ -18,7 +18,7 @@ import { whatsappUrl } from "@/lib/site";
  */
 
 /** Where the direct-WhatsApp booking intent originated — attributed in analytics. */
-export type BookingSource = "top_bar" | "gift" | "interest" | "agenda_fallback";
+export type BookingSource = "gift" | "interest";
 
 type BookingButtonProps = {
   source: BookingSource;

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Check, Gift, Sparkles, Video } from "lucide-react";
-import { Badge, Button, Card, CardContent } from "@saas/ui";
+import { Badge, Card, CardContent } from "@saas/ui";
 import { AgendaCta } from "@/components/brand/agenda-cta";
+import { GiftCta } from "@/components/brand/gift-cta";
 import { GiftBlock } from "@/components/catalog/gift-block";
 import { InterestCta } from "@/components/catalog/interest-cta";
 import {
@@ -109,12 +110,10 @@ export function ServicePage({ service, extra }: { service: Service; extra?: Reac
                 </p>
               )}
               {service.allowsGift && (
-                <Button asChild size="lg" variant="outline" className="w-full">
-                  <Link href="/regalar" aria-label={`Regalar esta cita: ${service.name}`}>
-                    <Gift className="size-5" aria-hidden />
-                    Regalar esta cita
-                  </Link>
-                </Button>
+                <GiftCta source="service_page" size="lg" className="w-full" aria-label={`Regalar esta cita: ${service.name}`}>
+                  <Gift className="size-5" aria-hidden />
+                  Regalar esta cita
+                </GiftCta>
               )}
             </CardContent>
           </Card>

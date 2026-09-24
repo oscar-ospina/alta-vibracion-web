@@ -16,7 +16,7 @@ import type { ServiceId } from "@/lib/catalog";
  * Same fire-and-forget pattern as BookingButton — never blocks navigation.
  */
 
-export type AgendaSource = "hero" | "consultation" | "top_bar" | "nav" | "gift_page";
+export type AgendaSource = "hero" | "consultation" | "top_bar" | "nav";
 
 type AgendaCtaProps = {
   source: AgendaSource;

@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Check, Gift, Sparkles, Video } from "lucide-react";
-import { Badge, Button, Card, CardContent } from "@saas/ui";
+import { Badge, Card, CardContent } from "@saas/ui";
 import { AgendaCta } from "@/components/brand/agenda-cta";
+import { GiftCta } from "@/components/brand/gift-cta";
 import { InterestCta } from "@/components/catalog/interest-cta";
 import { type Service, formatCOP, isSellable, servicePath } from "@/lib/catalog";
-import { ROUTES } from "@/lib/site";
 
 /**
  * One catalog card, driven by the service's status (plan sections 3 and 8).
@@ -82,12 +82,10 @@ export function ServiceCard({ service, withLink = true }: { service: Service; wi
                 </p>
               )}
               {service.allowsGift && (
-                <Button asChild size="sm" variant="outline" className="w-full">
-                  <Link href={ROUTES.gift} aria-label={`Regalar esta cita: ${service.name}`}>
-                    <Gift className="size-4" aria-hidden />
-                    Regalar esta cita
-                  </Link>
-                </Button>
+                <GiftCta source="card" size="sm" className="w-full" aria-label={`Regalar esta cita: ${service.name}`}>
+                  <Gift className="size-4" aria-hidden />
+                  Regalar esta cita
+                </GiftCta>
               )}
             </>
           ) : (

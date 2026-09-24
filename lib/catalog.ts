@@ -321,8 +321,14 @@ export const ACTIVE_SERVICES = SERVICES.filter(
   (s): s is SellableService => s.status === "active",
 );
 
-/** The first session, the one product of October. */
-export const FIRST_SESSION = ACTIVE_SERVICES.find((s) => s.id === "yo-01")!;
+/**
+ * The first session, the one product of October. Sellable (active or paused)
+ * so the pages that describe it keep rendering while Liliana pauses the
+ * offer; only the agenda checks `active`.
+ */
+export const FIRST_SESSION = SERVICES.find(
+  (s): s is SellableService => s.id === "yo-01" && isSellable(s),
+)!;
 
 export function servicePath(s: Service): string {
   return `/${s.line}/${s.slug}`;

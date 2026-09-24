@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Calendar, Gift, Menu, X } from "lucide-react";
-import { Button, cn } from "@saas/ui";
+import { cn } from "@saas/ui";
+import { AgendaCta } from "@/components/brand/agenda-cta";
+import { GiftCta } from "@/components/brand/gift-cta";
 import { LINES } from "@/lib/catalog";
 import { ROUTES } from "@/lib/site";
 
@@ -45,11 +47,15 @@ export function SiteNav() {
   const open = openFor === pathname;
   const setOpen = (next: boolean) => setOpenFor(next ? pathname : null);
   const panelId = useId();
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenFor(null);
+      if (e.key !== "Escape") return;
+      setOpenFor(null);
+      // The panel unmounts with focus inside it; hand focus back to the toggle (WCAG 2.4.3).
+      toggleRef.current?.focus();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -82,20 +88,17 @@ export function SiteNav() {
       </nav>
 
       <div className="flex items-center gap-2">
-        <Button asChild size="sm" variant="outline" className="hidden whitespace-nowrap lg:inline-flex">
-          <Link href={ROUTES.gift}>
-            <Gift className="size-4" aria-hidden />
-            Regalar una cita
-          </Link>
-        </Button>
-        <Button asChild size="sm" className="whitespace-nowrap">
-          <Link href={ROUTES.agenda}>
-            <Calendar className="size-4" aria-hidden />
-            <span className="hidden sm:inline">Quiero mi primera sesión</span>
-            <span className="sm:hidden">Mi primera sesión</span>
-          </Link>
-        </Button>
+        <GiftCta source="top_bar" size="sm" className="hidden whitespace-nowrap lg:inline-flex">
+          <Gift className="size-4" aria-hidden />
+          Regalar una cita
+        </GiftCta>
+        <AgendaCta source="top_bar" size="sm" className="whitespace-nowrap">
+          <Calendar className="size-4" aria-hidden />
+          <span className="hidden sm:inline">Quiero mi primera sesión</span>
+          <span className="sm:hidden">Mi primera sesión</span>
+        </AgendaCta>
         <button
+          ref={toggleRef}
           type="button"
           aria-expanded={open}
           aria-controls={panelId}
@@ -125,24 +128,22 @@ export function SiteNav() {
                   href={l.href}
                   className={cn(linkClass(l.href), "block px-2 py-3 text-base")}
                   aria-current={isCurrent(pathname, l.href) ? "page" : undefined}
+                  // Same-path taps do not change the pathname, so close by hand.
+                  onClick={() => setOpenFor(null)}
                 >
                   {l.label}
                 </Link>
               </li>
             ))}
             <li className="mt-2 flex flex-col gap-2 border-t border-neutral-100 pt-4 lg:hidden">
-              <Button asChild size="lg">
-                <Link href={ROUTES.agenda}>
-                  <Calendar className="size-5" aria-hidden />
-                  Quiero mi primera sesión
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link href={ROUTES.gift}>
-                  <Gift className="size-5" aria-hidden />
-                  Regalar una cita
-                </Link>
-              </Button>
+              <AgendaCta source="nav" size="lg">
+                <Calendar className="size-5" aria-hidden />
+                Quiero mi primera sesión
+              </AgendaCta>
+              <GiftCta source="nav" size="lg">
+                <Gift className="size-5" aria-hidden />
+                Regalar una cita
+              </GiftCta>
             </li>
           </ul>
         </nav>

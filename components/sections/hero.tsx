@@ -1,9 +1,8 @@
 import Image from "next/image";
-import Link from "next/link";
 import { Calendar, Gift } from "lucide-react";
-import { Button } from "@saas/ui";
 import { AgendaCta } from "@/components/brand/agenda-cta";
-import { ROUTES } from "@/lib/site";
+import { GiftCta } from "@/components/brand/gift-cta";
+import { FIRST_SESSION } from "@/lib/catalog";
 
 /**
  * Home hero: cosmic backdrop + dark scrim, the gradient-accented H1, subhead,
@@ -44,33 +43,30 @@ export function Hero() {
           </h1>
           <p className="mt-5 text-lg leading-relaxed text-white/85">
             Cada número tiene una vibración única que habla de ti. Tu primera sesión
-            individual de 75 minutos es el comienzo: tu mapa, una pregunta personal y
-            un resumen para conservar.
+            individual de {FIRST_SESSION.durationMinutes} minutos es el comienzo: tu mapa,
+            una pregunta personal y un resumen para conservar.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <AgendaCta source="hero" size="lg">
               <Calendar className="size-5" aria-hidden />
               Quiero mi primera sesión
             </AgendaCta>
-            <Button
-              asChild
+            <GiftCta
+              source="hero"
               size="lg"
-              variant="outline"
               className="border-white/60 bg-transparent text-white hover:bg-white/10 hover:text-white"
             >
-              <Link href={ROUTES.gift}>
-                <Gift className="size-5" aria-hidden />
-                Regalar una cita
-              </Link>
-            </Button>
+              <Gift className="size-5" aria-hidden />
+              Regalar una cita
+            </GiftCta>
           </div>
         </div>
 
         {/* Brand line-art decoration: the gold botanical line-art as an IN-FLOW
             right column at lg+ (ml-auto pushes it to the edge), side-by-side with the
             text exactly like Figma, so it can never sit behind the H1/subhead. The warm
-            glow is baked into the SVG's own drop-shadow filter. Desktop-only — mobile
-            keeps the uniform scrim. Decorative → aria-hidden + pointer-events-none. */}
+            glow is baked into the SVG's own drop-shadow filter. Desktop only; mobile
+            keeps the uniform scrim. Decorative, so aria-hidden and pointer-events-none. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/hero-decoration.svg"

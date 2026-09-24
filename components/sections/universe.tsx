@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@saas/ui";
-import { EXPECTATION_NOTE, LINES, servicesOf } from "@/lib/catalog";
+import { EXPECTATION_NOTE, LINES, isSellable, servicesOf } from "@/lib/catalog";
 
 /**
  * "Universo 729" on the home (plan section 8): the four lines with the
@@ -40,13 +40,13 @@ export function Universe() {
                         <li
                           key={s.id}
                           className={
-                            s.status === "active"
+                            isSellable(s)
                               ? "rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700"
                               : "rounded-full border border-neutral-200 px-3 py-1 text-xs text-muted-foreground"
                           }
                         >
                           {s.name}
-                          {s.status !== "active" && " · en preparación"}
+                          {!isSellable(s) && " · en preparación"}
                         </li>
                       ))}
                     </ul>
