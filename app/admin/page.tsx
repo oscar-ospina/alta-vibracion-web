@@ -17,7 +17,8 @@ import { BOGOTA, formatInZone, formatLongDate, todayInBogota } from "@/lib/agend
 import { FIRST_SESSION, bookingServiceLabel, formatCOP } from "@/lib/catalog";
 import { displayContact } from "@/lib/contact";
 import { REPORT_STATUS_LABEL, STAGE_LABEL, STATUS_LABEL, adminNotice } from "@/lib/agenda/labels";
-import { addOverride, cancelBooking, confirmBooking, createManualBookingAction, deleteOverride } from "./actions";
+import { bookingsPaused } from "@/lib/settings";
+import { addOverride, cancelBooking, confirmBooking, createManualBookingAction, deleteOverride, setBookingsPausedAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,13 @@ export default async function AdminPage({
   let pendingIntake: Awaited<ReturnType<typeof listPendingIntake>> = [];
   let pendingDeliveries: BookingWithReport[] = [];
   let followUps: Awaited<ReturnType<typeof listFollowUpsDue>> = [];
+  let paused = false;
+  try {
+    paused = await bookingsPaused();
+  } catch (err) {
+    // The switch must never blank the dashboard; a failed read shows "Abiertas".
+    console.error("admin: settings unavailable", err);
+  }
   try {
     [bookings, overrides, reports, pendingIntake, pendingDeliveries, followUps] = await Promise.all([
       listUpcomingBookings(now),
@@ -113,7 +121,9 @@ export default async function AdminPage({
         {" · "}
         <Link href="/admin/campaigns" className={LINK}>Campañas de encuentro</Link>
         {" · "}
-        <Link href="/admin/gifts" className={LINK}>Regalos</Link>.
+        <Link href="/admin/gifts" className={LINK}>Regalos</Link>
+        {" · "}
+        <Link href="/admin/guide" className={LINK}>Guía de operación</Link>.
       </p>
 
       {notice && (
@@ -332,6 +342,34 @@ export default async function AdminPage({
           ))}
         </ul>
       )}
+
+      <h2 className="mt-10 text-xl font-bold text-foreground">Reservas públicas</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        En pausa, /agenda no muestra horarios y ofrece WhatsApp. Las reservas hechas, el admin y las
+        reservas manuales siguen funcionando.
+      </p>
+      <form action={setBookingsPausedAction} className="mt-3 flex flex-wrap items-center gap-3" data-testid="pause-form">
+        <input type="hidden" name="paused" value={paused ? "0" : "1"} />
+        <span className="font-semibold" data-testid="pause-state">{paused ? "En pausa" : "Abiertas"}</span>
+        <Button type="submit" variant={paused ? "default" : "outline"}>
+          {paused ? "Reanudar reservas" : "Pausar reservas"}
+        </Button>
+      </form>
+
+      <h2 className="mt-10 text-xl font-bold text-foreground">Exportar</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Archivos CSV para tu registro y respaldo semanal. Contienen datos personales: guárdalos en
+        tu carpeta privada.
+      </p>
+      <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm" data-testid="export-links">
+        {(["bookings", "interests", "campaigns", "gifts"] as const).map((t) => (
+          <li key={t}>
+            <a href={`/admin/export/${t}`} className={LINK} download>
+              {{ bookings: "Reservas", interests: "Intereses", campaigns: "Campañas", gifts: "Regalos" }[t]}
+            </a>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

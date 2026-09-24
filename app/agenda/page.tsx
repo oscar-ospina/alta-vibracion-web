@@ -9,6 +9,7 @@ import { CAMPAIGN_CODE_RE, quote } from "@/lib/campaigns";
 import { ACTIVE_SERVICES, FIRST_SESSION, formatCOP } from "@/lib/catalog";
 import { GIFT_CODE_RE, redeemableGift } from "@/lib/gifts";
 import { paymentInstructions } from "@/lib/payment";
+import { bookingsPaused } from "@/lib/settings";
 import { whatsappUrl } from "@/lib/site";
 import { AgendaFlow, AgendaSkeleton, type CampaignOffer, type GiftVoucher } from "@/components/agenda/agenda-flow";
 
@@ -34,9 +35,19 @@ export default async function AgendaPage({
   const params = await searchParams;
   const campana = typeof params.campana === "string" ? params.campana : "";
   const bono = typeof params.bono === "string" ? params.bono : "";
-  // Liliana pauses the offer by setting the service to `paused`: the agenda
-  // then shows the manual path instead of a calendar nobody can buy from.
-  let online = hasDatabase() && ACTIVE_SERVICES.length > 0;
+  // Two ways the offer can be paused: the catalog (no active service; needs
+  // code) and Liliana's runtime switch in /admin (settings.bookings_paused).
+  // Either one shows the manual path instead of a calendar nobody can buy from.
+  const db = hasDatabase();
+  let paused = ACTIVE_SERVICES.length === 0;
+  if (db && !paused) {
+    try {
+      paused = await bookingsPaused();
+    } catch (err) {
+      console.error("agenda: settings unavailable", err);
+    }
+  }
+  let online = db && !paused;
   let slots: Awaited<ReturnType<typeof loadAvailability>> = [];
   // A campaign link (plan section 5). Active: the flow shows its price and
   // the server validates the contact. Anything else: say so, then continue
@@ -61,7 +72,9 @@ export default async function AgendaPage({
   // continue at the general price, visibly.
   // A gift voucher (plan section 7.1): paid, the beneficiary books without
   // paying; anything else is said out loud and the flow stays at the general price.
-  if (online && bono) {
+  // The lookups run even while paused, so a beneficiary or a registered
+  // attendee is told their voucher or offer is still theirs.
+  if (db && bono) {
     const giftCode = bono.toUpperCase();
     try {
       const g = GIFT_CODE_RE.test(giftCode) ? await redeemableGift(giftCode) : ({ state: "not_found" } as const);
@@ -82,7 +95,7 @@ export default async function AgendaPage({
     }
   }
 
-  if (online && campana && !voucher) {
+  if (db && campana && !voucher) {
     const code = campana.toUpperCase();
     try {
       const q = CAMPAIGN_CODE_RE.test(code) ? await quote(code, null) : ({ state: "not_found" } as const);
@@ -119,8 +132,12 @@ export default async function AgendaPage({
       <p className="mt-2 text-muted-foreground">
         {online
           ? "Elige tu sesión, la fecha y la hora. Tu cita queda confirmada cuando Liliana verifique el pago."
-          : ACTIVE_SERVICES.length === 0
-            ? "Las reservas están en pausa por ahora. Escríbenos por WhatsApp si quieres una fecha."
+          : paused
+            ? voucher
+              ? "Las reservas están en pausa por ahora. Tu bono de regalo sigue válido: escríbenos por WhatsApp y acordamos la fecha."
+              : offer
+                ? `Las reservas están en pausa por ahora. Tu tarifa del encuentro «${offer.name}» sigue válida: escríbenos por WhatsApp y acordamos la fecha.`
+                : "Las reservas están en pausa por ahora. Escríbenos por WhatsApp si quieres una fecha."
             : "Escríbenos por WhatsApp y te compartimos los horarios disponibles."}
       </p>
 
@@ -135,7 +152,7 @@ export default async function AgendaPage({
           <AgendaFlow slots={slots} holdHours={holdHours()} offer={voucher ? null : offer} voucher={voucher} brebAvailable={paymentInstructions() !== null} />
         </Suspense>
       ) : (
-        <div className="mt-8" data-testid="agenda-fallback">
+        <div className="mt-8" data-testid="agenda-fallback" data-paused={paused ? "1" : undefined}>
           <Button asChild size="lg">
             <a
               href={whatsappUrl(

@@ -12,6 +12,7 @@ import { markAttended, markFollowUpDone, markIntakeReceived, saveReport } from "
 import { setInterestStatus } from "@/lib/interests";
 import { activateCampaign, closeCampaign, createCampaign } from "@/lib/campaigns";
 import { createGiftFromInterest, createGiftOrder, setGiftStatus, updateGiftMessage } from "@/lib/gifts";
+import { setBookingsPaused } from "@/lib/settings";
 import { HHMM_RE, ISO_DATE_RE, addDays, bogotaInstant, weekdayOf } from "@/lib/agenda/time";
 import type { AdminNoticeKey } from "@/lib/agenda/labels";
 
@@ -302,4 +303,14 @@ export async function updateGiftMessageAction(formData: FormData) {
   const message = String(formData.get("message") ?? "").slice(0, 500);
   const res = UUID_RE.test(id) ? await updateGiftMessage(id, message) : ({ ok: false, error: "not_found" } as const);
   notifyGifts(res.ok ? "saved" : "gift_not_found");
+}
+
+// Operating switches (lib/settings.ts).
+
+export async function setBookingsPausedAction(formData: FormData) {
+  await requireAdmin();
+  await setBookingsPaused(formData.get("paused") === "1");
+  revalidatePath("/admin");
+  revalidatePath("/agenda");
+  notify("saved");
 }

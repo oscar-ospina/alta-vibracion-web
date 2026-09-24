@@ -89,6 +89,7 @@ export async function submitBooking(
       campaign_sold_out: "Los cupos de esta oferta se acaban de agotar. Escríbenos para consultar disponibilidad general.",
       gift_unavailable: "Este bono de regalo no está disponible para reservar. Pide a quien te lo regaló que confirme con Liliana.",
       gift_used: "Este bono ya fue canjeado. Si crees que hay un error, escríbenos.",
+      paused: "Las reservas están en pausa por ahora. Escríbenos por WhatsApp si quieres una fecha.",
     } as const;
     return { status: "error", message: messages[result.error] };
   }
