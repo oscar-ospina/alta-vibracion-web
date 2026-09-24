@@ -109,6 +109,11 @@ describe("activation", () => {
     assert.ok((await activateCampaign(full.id)).ok);
   });
 
+  it("rejects values out of bounds", async () => {
+    const huge = await createCampaign({ name: "Cara", priceCop: 98_900_000_000, threshold: 3, capacity: 3, allowsGift: false, conditions: "" });
+    assert.deepEqual(huge, { ok: false, error: "bad_values" });
+  });
+
   it("rejects a closing instant in the past", async () => {
     const c = await campaignWith(PEOPLE);
     const now = new Date("2026-10-01T12:00:00Z");
@@ -188,6 +193,8 @@ describe("campaign price on bookings", () => {
 
     await closeCampaign(c.id);
     assert.equal((await quote(c.code, PEOPLE[0])).state, "closed");
+    const closed = await createBooking(booking(slots[1].startsAt, PEOPLE[0], c.code), activatedAt);
+    assert.deepEqual(closed, { ok: false, error: "campaign_unavailable" });
     assert.equal((await quote("E-NOPE1234", PEOPLE[0])).state, "not_found");
     assert.equal((await quote("garbage", PEOPLE[0])).state, "not_found");
   });

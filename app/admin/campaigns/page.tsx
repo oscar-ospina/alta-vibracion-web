@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Button, Card, CardContent, Input, Label, cn } from "@saas/ui";
 import { hasDatabase } from "@/db/client";
-import { ADMIN_NOTICE, CAMPAIGN_STATUS_LABEL, type AdminNoticeKey } from "@/lib/agenda/labels";
+import { CAMPAIGN_STATUS_LABEL, adminNotice } from "@/lib/agenda/labels";
 import { BOGOTA, formatInZone } from "@/lib/agenda/time";
-import { type CampaignSummary, DEFAULT_WINDOW_HOURS, listCampaigns, summarize } from "@/lib/campaigns";
+import { type Campaign } from "@/db/schema";
+import { type CampaignView, DEFAULT_WINDOW_HOURS, countPromoUsed, listCampaigns, viewOf } from "@/lib/campaigns";
 import { formatCOP } from "@/lib/catalog";
 import { displayContact } from "@/lib/contact";
 import { listCampaignInterests } from "@/lib/interests";
+import type { Interest } from "@/db/schema";
 import { SITE_URL } from "@/lib/site";
 import { activateCampaignAction, closeCampaignAction, createCampaignAction } from "../actions";
 
@@ -30,9 +32,18 @@ const VIEW_LABEL = {
   closed: "Cerrada",
 } as const;
 
-async function CampaignCard({ s }: { s: CampaignSummary }) {
+/** Everything one card shows, fetched once per campaign. */
+type CardData = {
+  campaign: Campaign;
+  view: CampaignView;
+  promoUsed: number;
+  /** Registered people, with the closed ones left out (the count Liliana checks against the threshold). */
+  registered: Interest[];
+};
+
+function CampaignCard({ s }: { s: CardData }) {
   const c = s.campaign;
-  const registered = await listCampaignInterests(c.id);
+  const registered = s.registered;
   const link = `${SITE_URL}/encuentros/${c.code}`;
   return (
     <li className="rounded-xl border p-4" data-code={c.code} data-testid="campaign-card">
@@ -46,7 +57,7 @@ async function CampaignCard({ s }: { s: CampaignSummary }) {
       <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
         <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Precio de campaña</dt><dd>{formatCOP(c.priceCop)}</dd></div>
         <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Umbral</dt><dd>{c.threshold} personas</dd></div>
-        <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Registrados</dt><dd data-testid="campaign-registered">{s.registered}</dd></div>
+        <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Registrados</dt><dd data-testid="campaign-registered">{registered.length}</dd></div>
         <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Cupos usados</dt><dd data-testid="campaign-used">{s.promoUsed} de {c.capacity}</dd></div>
         <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Regalo con tarifa</dt><dd>{c.allowsGift ? "Sí" : "No"}</dd></div>
         <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Estado guardado</dt><dd>{CAMPAIGN_STATUS_LABEL[c.status]}</dd></div>
@@ -104,7 +115,7 @@ export default async function AdminCampaignsPage({
   searchParams: Promise<{ aviso?: string }>;
 }) {
   const { aviso } = await searchParams;
-  const notice = aviso && aviso in ADMIN_NOTICE ? ADMIN_NOTICE[aviso as AdminNoticeKey] : null;
+  const notice = adminNotice(aviso);
   if (!hasDatabase()) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-10">
@@ -112,10 +123,16 @@ export default async function AdminCampaignsPage({
       </div>
     );
   }
-  let summaries: CampaignSummary[];
+  let summaries: CardData[];
   try {
     const now = new Date();
-    summaries = await Promise.all((await listCampaigns()).map((c) => summarize(c, now)));
+    summaries = await Promise.all(
+      (await listCampaigns()).map(async (campaign) => {
+        const [people, promoUsed] = await Promise.all([listCampaignInterests(campaign.id), countPromoUsed(campaign.id, now)]);
+        const registered = people.filter((p) => p.status !== "closed");
+        return { campaign, view: viewOf(campaign, promoUsed, now), promoUsed, registered };
+      }),
+    );
   } catch (err) {
     console.error("admin: campaigns unavailable", err);
     return (

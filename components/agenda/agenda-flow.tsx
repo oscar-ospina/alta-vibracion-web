@@ -130,11 +130,11 @@ export function AgendaFlow({
 
   useEffect(() => {
     if (state.status === "created") {
-      track("booking_created", { service: state.serviceId, origin: origin || "direct" });
+      track("booking_created", { service: state.serviceId, origin: origin || offer?.code || "direct" });
     }
     // A conflict means our slot list is stale: ask the server for a fresh one.
     if (state.status === "error") router.refresh();
-  }, [state, origin, router]);
+  }, [state, origin, offer, router]);
 
   // The page only renders the flow when a service is active; this keeps the
   // component honest if that ever changes.

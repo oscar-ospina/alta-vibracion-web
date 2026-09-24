@@ -27,9 +27,10 @@ export const dynamic = "force-dynamic";
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ campana?: string }>;
+  searchParams: Promise<{ campana?: string | string[] }>;
 }) {
-  const { campana } = await searchParams;
+  const params = await searchParams;
+  const campana = typeof params.campana === "string" ? params.campana : "";
   // Liliana pauses the offer by setting the service to `paused`: the agenda
   // then shows the manual path instead of a calendar nobody can buy from.
   let online = hasDatabase() && ACTIVE_SERVICES.length > 0;
@@ -42,28 +43,42 @@ export default async function AgendaPage({
   if (online) {
     try {
       slots = await loadAvailability();
-      const code = (campana ?? "").toUpperCase();
-      if (code && CAMPAIGN_CODE_RE.test(code)) {
-        const q = await quote(code, null);
-        if (q.state === "active") {
-          offer = {
-            code: q.campaign.code,
-            name: q.campaign.name,
-            priceCop: q.campaign.priceCop,
-            closesAt: q.campaign.closesAt?.toISOString() ?? null,
-          };
-        } else if (q.state !== "not_found") {
-          campaignNotice = `La oferta del encuentro «${q.campaign.name}» ya no está activa (${
-            q.state === "expired" ? "el plazo terminó" : q.state === "sold_out" ? "los cupos se agotaron" : q.state === "interest" ? "aún no se ha activado" : "está cerrada"
-          }). Lo que reserves aquí va al precio general de ${formatCOP(FIRST_SESSION.price)}.`;
-        }
-      } else if (campana) {
-        campaignNotice = "El enlace del encuentro no es válido. Lo que reserves aquí va al precio general.";
-      }
     } catch (err) {
       // Unreachable or unmigrated database: degrade to the manual path.
       console.error("agenda: availability unavailable", err);
       online = false;
+    }
+  }
+  // A campaign link (plan section 5), checked on its own so a campaign
+  // problem never takes the general agenda down. Active: the flow shows its
+  // price and the server validates the contact. Anything else: say so, then
+  // continue at the general price, visibly.
+  if (online && campana) {
+    const code = campana.toUpperCase();
+    try {
+      const q = CAMPAIGN_CODE_RE.test(code) ? await quote(code, null) : ({ state: "not_found" } as const);
+      const general = `Lo que reserves aquí va al precio general de ${formatCOP(FIRST_SESSION.price)}.`;
+      if (q.state === "active") {
+        offer = {
+          code: q.campaign.code,
+          name: q.campaign.name,
+          priceCop: q.campaign.priceCop,
+          closesAt: q.campaign.closesAt?.toISOString() ?? null,
+        };
+      } else if (q.state === "not_found") {
+        campaignNotice = `El enlace del encuentro no corresponde a una campaña. ${general}`;
+      } else if (q.state === "interest") {
+        campaignNotice = `La oferta del encuentro «${q.campaign.name}» todavía no se ha activado: Liliana la abre cuando confirma el grupo. ${general}`;
+      } else if (q.state === "expired") {
+        campaignNotice = `El plazo de la oferta del encuentro «${q.campaign.name}» terminó. ${general}`;
+      } else if (q.state === "sold_out") {
+        campaignNotice = `Los cupos de la oferta del encuentro «${q.campaign.name}» se agotaron. ${general}`;
+      } else {
+        campaignNotice = `La oferta del encuentro «${q.campaign.name}» está cerrada. ${general}`;
+      }
+    } catch (err) {
+      console.error("agenda: campaign lookup failed", err);
+      campaignNotice = "No pudimos comprobar la oferta del encuentro. Lo que reserves aquí va al precio general; escríbenos si tenías una tarifa.";
     }
   }
 

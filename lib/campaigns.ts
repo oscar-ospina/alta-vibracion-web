@@ -13,6 +13,7 @@
 import { randomBytes } from "node:crypto";
 import { and, count, desc, eq, gt, inArray, ne, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
+import { UNIQUE_VIOLATION, pgError } from "@/db/errors";
 import type { Campaign } from "@/db/schema";
 import { findService } from "@/lib/catalog";
 import { addMinutes } from "./agenda/time";
@@ -30,6 +31,10 @@ export const CAMPAIGN_CODE_RE = /^E-[A-Z2-9]{8}$/;
 
 /** Plan's proposed window: 48 hours from activation to buy. */
 export const DEFAULT_WINDOW_HOURS = 48;
+
+/** Sanity bounds: a price above this is a typo, and int4 would refuse it anyway. */
+export const MAX_PRICE_COP = 100_000_000;
+export const MAX_PEOPLE = 1000;
 
 export type CreateCampaignInput = {
   name: string;
@@ -50,7 +55,13 @@ export async function createCampaign(
   now: Date = new Date(),
 ): Promise<CreateCampaignResult> {
   const ints = [input.priceCop, input.threshold, input.capacity];
-  if (!ints.every((n) => Number.isInteger(n) && n > 0) || input.name.trim().length < 2) {
+  if (
+    !ints.every((n) => Number.isInteger(n) && n > 0) ||
+    input.priceCop > MAX_PRICE_COP ||
+    input.threshold > MAX_PEOPLE ||
+    input.capacity > MAX_PEOPLE ||
+    input.name.trim().length < 2
+  ) {
     return { ok: false, error: "bad_values" };
   }
   const db = getDb();
@@ -74,8 +85,7 @@ export async function createCampaign(
         .returning();
       return { ok: true, campaign: row };
     } catch (err) {
-      const code = (err as { cause?: { code?: string } })?.cause?.code;
-      if (code !== "23505") throw err;
+      if (pgError(err)?.code !== UNIQUE_VIOLATION) throw err;
     }
   }
   throw new Error("could not allocate a unique campaign code");
@@ -230,6 +240,39 @@ export async function quote(code: string, contactValue: string | null, now: Date
   return { state: "active", campaign, eligible };
 }
 
-/** Lock the campaign row inside a transaction so two buyers cannot share the last cupo. */
-export const lockCampaignRow = (id: string) =>
-  sql`select id from campaigns where id = ${id} for update`;
+/**
+ * Inside the booking transaction: lock the campaign row and re-read it, so
+ * a close, an expiry or the last cupo racing the insert is seen here, not
+ * only in the pre-read. Returns the campaign's view at `now` under the lock.
+ */
+export async function lockAndViewCampaign(
+  tx: { execute: (q: ReturnType<typeof sql>) => Promise<{ rows: unknown[] }> },
+  campaignId: string,
+  now: Date,
+): Promise<{ campaign: Campaign; view: CampaignView } | null> {
+  const locked = await tx.execute(sql`select * from campaigns where id = ${campaignId} for update`);
+  const raw = locked.rows[0] as Record<string, unknown> | undefined;
+  if (!raw) return null;
+  const campaign: Campaign = {
+    id: raw.id as string,
+    code: raw.code as string,
+    name: raw.name as string,
+    serviceId: raw.service_id as string,
+    priceCop: Number(raw.price_cop),
+    threshold: Number(raw.threshold),
+    capacity: Number(raw.capacity),
+    status: raw.status as Campaign["status"],
+    opensAt: raw.opens_at ? new Date(raw.opens_at as string) : null,
+    closesAt: raw.closes_at ? new Date(raw.closes_at as string) : null,
+    allowsGift: Boolean(raw.allows_gift),
+    conditions: raw.conditions as string,
+    conditionsVersion: Number(raw.conditions_version),
+    createdAt: new Date(raw.created_at as string),
+    updatedAt: new Date(raw.updated_at as string),
+  };
+  const used = await tx.execute(
+    sql`select count(*)::int as n from bookings where campaign_id = ${campaignId} and status in ('pending_payment', 'confirmed')`,
+  );
+  const promoUsed = Number((used.rows[0] as { n: number }).n);
+  return { campaign, view: viewOf(campaign, promoUsed, now) };
+}

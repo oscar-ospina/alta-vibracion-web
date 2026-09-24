@@ -8,6 +8,7 @@
  */
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
+import { UNIQUE_VIOLATION, pgError } from "@/db/errors";
 import type { Interest, InterestKind, InterestStatus } from "@/db/schema";
 import { findService } from "@/lib/catalog";
 import type { ContactChannel } from "@/lib/contact";
@@ -93,21 +94,12 @@ export async function saveInterest(
     } catch (err) {
       // 23505 on interests_open_idx: the same person submitted twice at once.
       // The index is the guard; the next loop turn updates the winner's row.
-      if (unwrapCode(err) !== "23505") throw err;
+      if (pgError(err)?.code !== UNIQUE_VIOLATION) throw err;
     }
   }
   throw new Error("could not save the interest");
 }
 
-function unwrapCode(err: unknown): string | undefined {
-  let cur: unknown = err;
-  for (let i = 0; i < 5 && cur && typeof cur === "object"; i++) {
-    const e = cur as { code?: unknown; cause?: unknown };
-    if (typeof e.code === "string" && /^\d{5}$/.test(e.code)) return e.code;
-    cur = e.cause;
-  }
-  return undefined;
-}
 
 /** Open interests of one kind, newest first, for the admin lists. */
 export async function listInterests(kind: InterestKind, status: InterestStatus = "new"): Promise<Interest[]> {

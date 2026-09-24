@@ -168,8 +168,12 @@ export async function activateCampaignAction(formData: FormData) {
   let closesAt: Date | null = null;
   if (raw) {
     const m = raw.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
-    if (!m || !ISO_DATE_RE.test(m[1]) || !HHMM_RE.test(m[2])) notifyCampaigns("campaign_bad_window");
+    // A real calendar date, not just the shape (2026-13-01 and 2026-11-31 pass the regex).
+    if (!m || !ISO_DATE_RE.test(m[1]) || addDays(m[1], 0) !== m[1] || !HHMM_RE.test(m[2])) {
+      notifyCampaigns("campaign_bad_window");
+    }
     closesAt = bogotaInstant(m![1], m![2]);
+    if (Number.isNaN(closesAt.getTime())) notifyCampaigns("campaign_bad_window");
   }
   const res = await activateCampaign(id, { closesAt, force: formData.get("force") === "on" });
   if (!res.ok) {

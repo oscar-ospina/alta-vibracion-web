@@ -46,10 +46,16 @@ test("a campaign goes from QR link to a booking at the campaign price, and only 
   const code = link.split("/encuentros/")[1];
   expect(code).toMatch(/^E-[A-Z2-9]{8}$/);
 
-  // The public page shows no price commitment before activation, and unknown codes say so.
+  // The public page shows no price commitment before activation, and unknown codes say so,
+  // on the campaign page and on the agenda (well-formed or not).
   const unknown = await page.goto("/encuentros/E-NOPE1234");
   expect(unknown?.status()).toBe(200);
   await expect(page.getByTestId("campaign-state")).toContainText("Revisa el código");
+  await page.goto("/agenda?campana=E-ABCDEFGH");
+  await expect(page.getByTestId("campaign-notice")).toContainText("no corresponde a una campaña");
+  await expect(page.getByTestId("agenda-price")).toHaveText("COP 149.900");
+  await page.goto(`/agenda?campana=${code}`);
+  await expect(page.getByTestId("campaign-notice")).toContainText("todavía no se ha activado");
 
   // Three distinct adults register; one of them twice with another spelling.
   await register(page, code, "Ana", "+57 300 111 0001");
