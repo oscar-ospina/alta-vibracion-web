@@ -57,7 +57,7 @@ test("the gift entry is visible on the home, the menu, Mi Mapa 729 and Celebremo
   await expect(page.getByTestId("gift-steps").getByRole("listitem")).toHaveCount(3);
   await expect(page.getByText("El informe pertenece a quien toma la sesión.")).toBeVisible();
   await expect(page.getByText("Antes del pago confirmaremos disponibilidad, forma de entrega y condiciones del regalo.")).toBeVisible();
-  await expect(page.getByTestId("gift-inquiry").getByRole("link", { name: /Quiero regalar esta experiencia/ })).toHaveAttribute("href", /wa\.me/);
+  await expect(page.getByTestId("gift-inquiry").getByRole("button", { name: "Quiero regalar esta experiencia" })).toBeVisible();
 });
 
 test("the mobile menu exposes every line and both CTAs", async ({ browser }) => {
@@ -87,7 +87,7 @@ test("future services show no price and no booking, on the line pages and their 
   await expect(cards.locator(":scope > li")).toHaveCount(3);
   await expect(cards.getByText("En preparación")).toHaveCount(2);
   await expect(cards.getByText(/COP/)).toHaveCount(1);
-  await expect(cards.getByRole("link", { name: /Avísame cuando esté disponible: Mi Camino 729/ })).toHaveAttribute("href", /wa\.me/);
+  await expect(cards.getByRole("button", { name: /Avísame cuando esté disponible: Mi Camino 729/ })).toBeVisible();
   await expect(page.getByText("Este registro no es una reserva ni implica pago.", { exact: false })).toBeVisible();
 
   await page.goto("/yo/mi-camino-729");
@@ -101,12 +101,12 @@ test("future services show no price and no booking, on the line pages and their 
   await expect(page.getByTestId("line-nosotros").locator(":scope > li")).toHaveCount(4);
   await expect(page.getByText(/COP/)).toHaveCount(0);
   await page.goto("/nosotros/match");
-  await expect(page.getByRole("link", { name: /Quiero conocer el proyecto/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Quiero conocer el proyecto/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /alta-code/ })).toHaveCount(0);
 
   await page.goto("/empresas");
   await expect(page.getByTestId("line-empresas").locator(":scope > li")).toHaveCount(2);
-  await expect(page.getByRole("link", { name: /Soy empresa y me interesa/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Soy empresa y me interesa/ })).toBeVisible();
 
   // Unknown slugs 404.
   const res = await page.goto("/yo/no-existe");

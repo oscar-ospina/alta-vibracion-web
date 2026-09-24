@@ -44,9 +44,6 @@ export const SOCIAL = {
 export const BOOKING_MESSAGE =
   "Hola Alta Vibración, quiero agendar mi primera sesión de numerología.";
 
-/** Prefilled message for the gift inquiry while the assisted form is not live. */
-export const GIFT_MESSAGE =
-  "Hola, quiero regalar «Mi Mapa 729» a otra persona adulta. ¿Me cuentas las condiciones?";
 
 /** Build a wa.me click-to-chat URL with an optional prefilled message. */
 export function whatsappUrl(message: string = BOOKING_MESSAGE): string {

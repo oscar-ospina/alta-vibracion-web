@@ -106,7 +106,9 @@ export default async function AdminPage({
       <p className="mt-2 text-muted-foreground">
         Confirma una reserva solo después de verificar el pago en la cuenta. Las horas
         se muestran en hora de Colombia.{" "}
-        <Link href="/admin/script" className={LINK}>Guion y plan de siete días</Link>.
+        <Link href="/admin/script" className={LINK}>Guion y plan de siete días</Link>
+        {" · "}
+        <Link href="/admin/interests" className={LINK}>Intereses y regalos por consultar</Link>.
       </p>
 
       {notice && (

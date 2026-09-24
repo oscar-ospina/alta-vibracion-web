@@ -3,6 +3,7 @@
 import { hasDatabase } from "@/db/client";
 import { createBooking } from "@/lib/agenda/bookings";
 import { isValidTimeZone } from "@/lib/agenda/time";
+import { isContactChannel, isValidContact, normalizeContact } from "@/lib/contact";
 
 export type BookingFormState =
   | { status: "idle" }
@@ -15,9 +16,6 @@ export type BookingFormState =
       customerName: string;
       clientTimeZone: string;
     };
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_RE = /^\+?[\d\s().-]{7,20}$/;
 
 function str(formData: FormData, key: string): string {
   const v = formData.get(key);
@@ -46,14 +44,14 @@ export async function submitBooking(
   if (customerName.length < 2) {
     return { status: "error", message: "Cuéntanos cómo te llamas (mínimo 2 letras)." };
   }
-  if (contactChannel !== "whatsapp" && contactChannel !== "email") {
+  if (!isContactChannel(contactChannel)) {
     return { status: "error", message: "Elige cómo prefieres que te contactemos." };
   }
-  if (contactChannel === "email" && !EMAIL_RE.test(contactValue)) {
-    return { status: "error", message: "Revisa el correo electrónico." };
-  }
-  if (contactChannel === "whatsapp" && !PHONE_RE.test(contactValue)) {
-    return { status: "error", message: "Revisa el número de WhatsApp (con indicativo de país)." };
+  if (!isValidContact(contactChannel, contactValue)) {
+    return {
+      status: "error",
+      message: contactChannel === "email" ? "Revisa el correo electrónico." : "Revisa el número de WhatsApp (con indicativo de país).",
+    };
   }
   if (!isValidTimeZone(clientTimeZone)) {
     return { status: "error", message: "Elige tu zona horaria." };
@@ -67,7 +65,8 @@ export async function submitBooking(
     startsAt: new Date(startsAt).toISOString(),
     customerName,
     contactChannel,
-    contactValue,
+    // Stored normalized so a campaign can match it against an interest.
+    contactValue: normalizeContact(contactChannel, contactValue),
     clientTimeZone,
     origin,
   });

@@ -134,9 +134,61 @@ export const reports = pgTable("reports", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const interestKind = pgEnum("interest_kind", ["service", "gift", "company"]);
+export const interestStatus = pgEnum("interest_status", ["new", "contacted", "closed"]);
+
+/**
+ * Commercial interest (plan sections 7.1, 8 and 10 "Intereses"): a person
+ * asking to be told when a future service is ready, a company asking about
+ * the Empresas line, or someone asking to give the first session. Never a
+ * sale and never a reservation. Minimal data: a preferred name, one contact
+ * channel and the consent for that one notice. For a gift, no data about the
+ * beneficiary; for a family line, no data about the child.
+ *
+ * `contact_value` is stored normalized (lib/contact.ts) so a campaign can
+ * later match an interest against a booking. The partial unique index makes
+ * a repeated form update the open row instead of creating a second person.
+ */
+export const interests = pgTable(
+  "interests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: interestKind("kind").notNull(),
+    serviceId: text("service_id").notNull(),
+    preferredName: text("preferred_name").notNull(),
+    contactChannel: contactChannel("contact_channel").notNull(),
+    contactValue: text("contact_value").notNull(),
+    /** Companies only. */
+    organization: text("organization"),
+    /** Companies: what they want to explore. */
+    topic: text("topic"),
+    /** Gift: optional intent or dedication written by the buyer. */
+    message: text("message"),
+    /** Authorization for the one notice or the one reply this row is about. */
+    consent: boolean("consent").notNull().default(false),
+    status: interestStatus("status").notNull().default("new"),
+    /** Anonymous source tag, e.g. a campaign code. */
+    origin: text("origin"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    contactedAt: timestamp("contacted_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("interests_status_idx").on(t.status, t.kind),
+    // One open interest per person, kind and service. Duplicate forms update it.
+    uniqueIndex("interests_open_idx")
+      .on(t.kind, t.serviceId, t.contactValue)
+      .where(sql`${t.status} = 'new'`),
+  ],
+);
+
 export type AvailabilityRule = typeof availabilityRules.$inferSelect;
 export type AvailabilityOverride = typeof availabilityOverrides.$inferSelect;
 export type Booking = typeof bookings.$inferSelect;
 export type BookingStatus = Booking["status"];
 export type Report = typeof reports.$inferSelect;
 export type ReportStatus = Report["status"];
+export type Interest = typeof interests.$inferSelect;
+export type InterestKind = Interest["kind"];
+export type InterestStatus = Interest["status"];

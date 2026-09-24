@@ -13,3 +13,16 @@ test("a booking status page 404s without a database", async ({ page }) => {
   const res = await page.goto("/agenda/AV-ABCDEF");
   expect(res?.status()).toBe(404);
 });
+
+test("without a database the gift inquiry offers WhatsApp instead of a fake success", async ({ page }) => {
+  await page.goto("/regalar");
+  const form = page.getByTestId("interest-form");
+  await form.getByLabel("Tu nombre").fill("Sin Base");
+  await form.getByLabel("Tu número de WhatsApp").fill("+57 300 000 0000");
+  await form.getByRole("checkbox").check();
+  await form.getByRole("button", { name: "Quiero regalar esta experiencia" }).click();
+  const error = page.getByTestId("interest-error");
+  await expect(error).toContainText("No pudimos guardar tu registro");
+  await expect(error.getByRole("link", { name: "Escribir por WhatsApp" })).toHaveAttribute("href", /wa\.me/);
+  await expect(page.getByTestId("interest-saved")).toHaveCount(0);
+});

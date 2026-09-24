@@ -27,7 +27,7 @@ const db = getDb();
 
 async function reset() {
   assertDisposableDatabase();
-  await db.execute(sql`truncate table reports, bookings, availability_overrides`);
+  await db.execute(sql`truncate table interests, reports, bookings, availability_overrides`);
   await db.execute(sql`truncate table availability_rules restart identity`);
   await db.insert(schema.availabilityRules).values(
     [1, 2, 3, 4].map((weekday) => ({ weekday, time: "18:00", durationMinutes: 135 })),
