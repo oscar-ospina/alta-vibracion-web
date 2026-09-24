@@ -334,6 +334,17 @@ export function servicePath(s: Service): string {
   return `/${s.line}/${s.slug}`;
 }
 
+/**
+ * Name to show for a stored booking. YO-02 kept its id when it became
+ * "Mi Camino 729" (plan section 3), so a booking of the retired
+ * "Mi siguiente paso 729" (sold at COP 179.900 until 2026-09-23) is told
+ * apart by its frozen price and keeps its own name.
+ */
+export function bookingServiceLabel(b: { serviceId: string; priceCop: number }): string {
+  if (b.serviceId === "yo-02" && b.priceCop === 179900) return "Mi siguiente paso 729 (60 min)";
+  return findService(b.serviceId)?.name ?? b.serviceId;
+}
+
 /** Visible next to every price (plan, section 3). */
 export const NUMEROLOGY_DISCLAIMER =
   "La numerología se utiliza como herramienta simbólica de reflexión. No diagnostica ni garantiza resultados o predicciones.";

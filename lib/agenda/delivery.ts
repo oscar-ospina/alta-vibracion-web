@@ -8,7 +8,7 @@
 import { and, asc, desc, eq, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import type { Booking, Report, ReportStatus } from "@/db/schema";
-import { findService } from "@/lib/catalog";
+import { bookingServiceLabel } from "@/lib/catalog";
 import { effectiveStatus } from "./bookings";
 import { BOGOTA, addMinutes, formatInZone } from "./time";
 
@@ -185,7 +185,7 @@ export async function reportsByBookingId(): Promise<Map<string, Report>> {
  * already knows. Liliana fills the rest by hand; nothing here computes a map.
  */
 export function reportTemplate(b: Booking): string {
-  const service = findService(b.serviceId)?.name ?? b.serviceId;
+  const service = bookingServiceLabel(b);
   return [
     `# Resumen de tu sesión`,
     ``,
