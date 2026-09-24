@@ -67,7 +67,7 @@ export default async function BookingStatusPage({
             )}
             <div className="flex justify-between gap-4">
               <dt className="font-semibold text-foreground">Valor</dt>
-              <dd>{formatCOP(booking.priceCop)}</dd>
+              <dd>{booking.giftOrderId ? "Regalo ya pagado" : formatCOP(booking.priceCop)}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="font-semibold text-foreground">Estado</dt>

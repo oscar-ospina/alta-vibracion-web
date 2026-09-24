@@ -16,6 +16,8 @@ export type BookingFormState =
       customerName: string;
       clientTimeZone: string;
       priceCop: number;
+      /** A redeemed gift: confirmed on creation, nothing to pay. */
+      gift: boolean;
     };
 
 function str(formData: FormData, key: string): string {
@@ -39,6 +41,7 @@ export async function submitBooking(
   const clientTimeZone = str(formData, "clientTimeZone");
   const origin = str(formData, "origin").slice(0, 40) || null;
   const campaignCode = str(formData, "campaignCode").slice(0, 12).toUpperCase() || null;
+  const giftCode = str(formData, "giftCode").slice(0, 12).toUpperCase() || null;
 
   if (!startsAt || Number.isNaN(Date.parse(startsAt))) {
     return { status: "error", message: "Elige una fecha y una hora." };
@@ -69,6 +72,7 @@ export async function submitBooking(
     clientTimeZone,
     origin,
     campaignCode,
+    giftCode,
   });
 
   if (!result.ok) {
@@ -80,6 +84,8 @@ export async function submitBooking(
       campaign_unavailable: "La oferta de ese encuentro ya no está activa. No reservamos con el precio general sin avisarte: vuelve a la agenda sin el enlace del encuentro si quieres el precio general.",
       campaign_not_eligible: "Ese contacto no aparece registrado en el encuentro. Usa el mismo WhatsApp o correo con el que te registraste, o escríbenos.",
       campaign_sold_out: "Los cupos de esta oferta se acaban de agotar. Escríbenos para consultar disponibilidad general.",
+      gift_unavailable: "Este bono de regalo no está disponible para reservar. Pide a quien te lo regaló que confirme con Liliana.",
+      gift_used: "Este bono ya fue canjeado. Si crees que hay un error, escríbenos.",
     } as const;
     return { status: "error", message: messages[result.error] };
   }
@@ -93,5 +99,6 @@ export async function submitBooking(
     customerName: b.customerName,
     clientTimeZone: b.clientTimeZone,
     priceCop: b.priceCop,
+    gift: Boolean(b.giftOrderId),
   };
 }

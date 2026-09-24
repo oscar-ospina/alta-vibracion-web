@@ -120,8 +120,21 @@ export async function countRegistered(campaignId: string): Promise<number> {
   return n;
 }
 
-/** Promo cupos taken: confirmed orders plus pending ones whose hold is alive. */
+/**
+ * Promo cupos taken: confirmed orders plus pending ones whose hold is alive,
+ * plus the campaign's gift orders (plan section 5: a gift at the campaign
+ * price consumes the same capacity).
+ */
 export async function countPromoUsed(campaignId: string, now: Date = new Date()): Promise<number> {
+  const [{ gifts }] = await getDb()
+    .select({ gifts: count() })
+    .from(schema.giftOrders)
+    .where(
+      and(
+        eq(schema.giftOrders.campaignId, campaignId),
+        inArray(schema.giftOrders.status, ["pending_payment", "paid", "redeemed"]),
+      ),
+    );
   const [{ n }] = await getDb()
     .select({ n: count() })
     .from(schema.bookings)
@@ -134,7 +147,7 @@ export async function countPromoUsed(campaignId: string, now: Date = new Date())
         ),
       ),
     );
-  return n;
+  return n + gifts;
 }
 
 /**

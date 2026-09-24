@@ -10,6 +10,7 @@ import { isContactChannel, isValidContact, normalizeContact } from "@/lib/contac
 import { markAttended, markFollowUpDone, markIntakeReceived, saveReport } from "@/lib/agenda/delivery";
 import { setInterestStatus } from "@/lib/interests";
 import { activateCampaign, closeCampaign, createCampaign } from "@/lib/campaigns";
+import { createGiftFromInterest, createGiftOrder, setGiftStatus } from "@/lib/gifts";
 import { HHMM_RE, ISO_DATE_RE, addDays, bogotaInstant, weekdayOf } from "@/lib/agenda/time";
 import type { AdminNoticeKey } from "@/lib/agenda/labels";
 
@@ -211,6 +212,7 @@ export async function createManualBookingAction(formData: FormData) {
   const priceCop = Number(formData.get("priceCop"));
   const paid = formData.get("paid") === "on";
   const note = String(formData.get("note") ?? "").trim().slice(0, 40) || null;
+  const giftCode = String(formData.get("giftCode") ?? "").trim().toUpperCase().slice(0, 12) || null;
   if (!isContactChannel(contactChannel) || !isValidContact(contactChannel, contactRaw)) notify("manual_bad_contact");
   if (!ISO_DATE_RE.test(date) || addDays(date, 0) !== date) notify("bad_date");
   if (!HHMM_RE.test(time)) notify("bad_time");
@@ -224,9 +226,67 @@ export async function createManualBookingAction(formData: FormData) {
     priceCop,
     paid,
     note,
+    giftCode,
   });
   revalidatePath("/admin");
   revalidatePath("/agenda");
-  if (!res.ok) notify(res.error === "slot_taken" ? "slot_taken" : res.error === "past" ? "manual_past" : "manual_bad_values");
+  if (!res.ok) {
+    const key = {
+      slot_taken: "slot_taken",
+      past: "manual_past",
+      bad_values: "manual_bad_values",
+      gift_unavailable: "gift_unavailable",
+      gift_used: "gift_used",
+    } as const;
+    notify(key[res.error]);
+  }
   redirect(`/admin/bookings/${res.booking.id}?aviso=saved`);
+}
+
+// Gift orders (lib/gifts.ts): /admin/gifts.
+
+function notifyGifts(key: AdminNoticeKey): never {
+  revalidatePath("/admin/gifts");
+  redirect(`/admin/gifts?aviso=${key}`);
+}
+
+export async function createGiftOrderAction(formData: FormData) {
+  await requireAdmin();
+  const channel = String(formData.get("buyerContactChannel") ?? "");
+  const contactRaw = String(formData.get("buyerContactValue") ?? "").trim().slice(0, 120);
+  if (!isContactChannel(channel) || !isValidContact(channel, contactRaw)) notifyGifts("manual_bad_contact");
+  const campaignId = String(formData.get("campaignId") ?? "").trim();
+  if (campaignId && !UUID_RE.test(campaignId)) notifyGifts("gift_campaign_unavailable");
+  const res = await createGiftOrder({
+    buyerName: String(formData.get("buyerName") ?? "").slice(0, 80),
+    buyerContactChannel: channel,
+    buyerContactValue: normalizeContact(channel, contactRaw),
+    message: String(formData.get("message") ?? "").slice(0, 500),
+    priceCop: Number(formData.get("priceCop")),
+    campaignId: campaignId || null,
+    conditions: String(formData.get("conditions") ?? "").slice(0, 2000),
+    paid: formData.get("paid") === "on",
+  });
+  if (!res.ok) notifyGifts(res.error === "bad_values" ? "gift_bad_values" : "gift_campaign_unavailable");
+  revalidatePath("/admin");
+  notifyGifts("saved");
+}
+
+export async function createGiftFromInterestAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("interestId") ?? "");
+  const res = UUID_RE.test(id) ? await createGiftFromInterest(id) : ({ ok: false, error: "not_found" } as const);
+  revalidatePath("/admin/interests");
+  if (!res.ok) notifyGifts(res.error === "not_found" ? "interest_not_found" : res.error === "bad_values" ? "gift_bad_values" : "gift_campaign_unavailable");
+  notifyGifts("saved");
+}
+
+export async function setGiftStatusAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const status = String(formData.get("status") ?? "");
+  if (status !== "paid" && status !== "cancelled" && status !== "refunded") notifyGifts("gift_bad_transition");
+  const res = UUID_RE.test(id) ? await setGiftStatus(id, status) : ({ ok: false, error: "not_found" } as const);
+  revalidatePath("/admin");
+  notifyGifts(res.ok ? "saved" : res.error === "not_found" ? "gift_not_found" : "gift_bad_transition");
 }

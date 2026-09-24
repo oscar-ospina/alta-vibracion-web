@@ -64,7 +64,21 @@ export const ADMIN_NOTICE = {
   manual_bad_contact: "Revisa el contacto: un WhatsApp con indicativo o un correo válido.",
   manual_bad_values: "Revisa nombre, precio y nota (la nota solo admite letras, números y guiones).",
   manual_past: "La fecha y hora ya pasaron.",
+  gift_not_found: "Esa orden de regalo no existe.",
+  gift_bad_values: "Revisa los valores: nombre, contacto y precio.",
+  gift_bad_transition: "Esa orden no admite ese cambio de estado (una orden canjeada se gestiona desde su reserva).",
+  gift_campaign_unavailable: "Esa campaña no permite regalos, no está activa o no tiene cupos.",
+  gift_unavailable: "Ese bono no está pagado o no existe.",
+  gift_used: "Ese bono ya fue canjeado.",
 } as const;
+
+export const GIFT_STATUS_LABEL: Record<"pending_payment" | "paid" | "redeemed" | "cancelled" | "refunded", string> = {
+  pending_payment: "Pendiente de pago",
+  paid: "Pagado · por agendar",
+  redeemed: "Canjeado",
+  cancelled: "Cancelado",
+  refunded: "Reembolsado",
+};
 
 export const CAMPAIGN_STATUS_LABEL: Record<"draft" | "interest" | "active" | "closed", string> = {
   draft: "Borrador",

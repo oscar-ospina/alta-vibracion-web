@@ -111,7 +111,9 @@ export default async function AdminPage({
         {" · "}
         <Link href="/admin/interests" className={LINK}>Intereses y regalos por consultar</Link>
         {" · "}
-        <Link href="/admin/campaigns" className={LINK}>Campañas de encuentro</Link>.
+        <Link href="/admin/campaigns" className={LINK}>Campañas de encuentro</Link>
+        {" · "}
+        <Link href="/admin/gifts" className={LINK}>Regalos</Link>.
       </p>
 
       {notice && (
@@ -149,7 +151,9 @@ export default async function AdminPage({
                     </td>
                     <td className="py-2 pr-3">
                       {bookingServiceLabel(b)}
-                      <span className="block text-xs text-muted-foreground">{formatCOP(b.priceCop)}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {b.giftOrderId ? "Regalo canjeado" : formatCOP(b.priceCop)}
+                      </span>
                     </td>
                     <td className="py-2 pr-3">
                       {b.customerName}
@@ -259,7 +263,11 @@ export default async function AdminPage({
             </div>
             <div>
               <Label htmlFor="mb-note">Nota de origen (opcional, sin espacios)</Label>
-              <Input id="mb-note" name="note" maxLength={40} className="mt-2" placeholder="regalo-AV-XXXXXX" />
+              <Input id="mb-note" name="note" maxLength={40} className="mt-2" placeholder="whatsapp" />
+            </div>
+            <div>
+              <Label htmlFor="mb-gift">Código de bono de regalo (opcional)</Label>
+              <Input id="mb-gift" name="giftCode" maxLength={12} className="mt-2" placeholder="RG-XXXXXXXX" />
             </div>
             <label className="flex items-center gap-2 self-end text-sm">
               <input type="checkbox" name="paid" className={cn("accent-orange-700", FOCUS_RING)} />
