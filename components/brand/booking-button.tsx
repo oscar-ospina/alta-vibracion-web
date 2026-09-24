@@ -6,11 +6,11 @@ import { Button } from "@saas/ui";
 import { whatsappUrl } from "@/lib/site";
 
 /**
- * Direct-WhatsApp booking CTA, with a conversion event (story
- * oscar-ospina/saas-planner#22). Since #45 only the TOP BAR uses it — the hero
- * and per-cita cards moved to AgendaCta (→ /agenda); the FAB tracks separately
- * (source "fab", different markup) and the Agenda flow fires `book_consultation`
- * with source "agenda" on its WhatsApp handoff.
+ * Direct-WhatsApp CTA, with a conversion event (story
+ * oscar-ospina/saas-planner#22). The hero and the catalog cards go to AgendaCta
+ * (→ /agenda); this button remains for the manual paths: the gift inquiry and
+ * the interest registration while their forms are not live, and the agenda
+ * fallback. The FAB tracks separately (source "fab").
  *
  * Client island: `track()` is fire-and-forget in onClick — we never
  * preventDefault or await, so navigation proceeds normally (it's a beacon) and
@@ -18,7 +18,7 @@ import { whatsappUrl } from "@/lib/site";
  */
 
 /** Where the direct-WhatsApp booking intent originated — attributed in analytics. */
-export type BookingSource = "top_bar" | "gift";
+export type BookingSource = "top_bar" | "gift" | "interest" | "agenda_fallback";
 
 type BookingButtonProps = {
   source: BookingSource;

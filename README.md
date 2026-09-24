@@ -6,16 +6,17 @@ The Alta Vibración site: Liliana Tobón's online numerology practice (Spanish, 
 
 Live at <https://alta-vibracion-web.vercel.app>.
 
-## Status (2026-09-18)
+## Status (2026-09-23)
 
-Shipped: the marketing home (hero, why numerology, about Liliana, consultations grid), legal pages, contact page, SEO, Vercel analytics with conversion events, WCAG 2.2 AA pass.
+Shipped: the marketing home (hero, first session, 729 universe, why numerology, about Liliana), the four line pages with their detail pages, the gift page, legal pages, contact page, SEO, Vercel analytics with conversion events, WCAG 2.2 AA pass.
 
-Following `../Alta_Vibracion_729_Plan_Ejecucion_V1.md` section 11:
+Following `../Alta_Vibracion_729_Plan_Ejecucion_2309.md` (plan V2.1, October 2026; decisions in [`docs/adr/2026-09-23-plan-v21.md`](docs/adr/2026-09-23-plan-v21.md)):
 
-- Catalog = the plan's three services (Mi Mapa 729, Mi siguiente paso 729, Regala Mi Mapa 729). `lib/consultations.ts`.
+- Catalog by states in `lib/catalog.ts`: only Mi Mapa 729 (YO-01) is `active` and sells; Mi Camino 729, Mi Huella 729 and the Nosotros, Celebremos and Empresas lines are in preparation (no price, no calendar, interest CTA). The gift of the first session is a modality of YO-01, presented at `/regalar` and from the home, the menu, the Mi Mapa 729 page and `/celebremos`.
+- Navigation: Inicio / Yo · 7 / Nosotros · 2 / Celebremos · 9 / Empresas / Regalar una cita, with a mobile menu. Public routes for these pages use the plan's Spanish slugs.
 - Agenda on Postgres, live in production on Neon since 2026-09-18. Weekly rules (Monday–Thursday 18:00 Bogotá) plus per-date exceptions, 24-hour holds, public booking code with a status page, `/admin` to confirm payments. Decision in [`docs/adr/2026-09-17-agenda-postgres.md`](docs/adr/2026-09-17-agenda-postgres.md); setup and operations in [`docs/agenda-setup.md`](docs/agenda-setup.md). Without `DATABASE_URL` the agenda falls back to WhatsApp.
 - Delivery in `/admin` since 2026-09-18: per-booking page with form-received, session-attended and day-14 follow-up marks; a report editor (draft / reviewed / approved, template from the plan's section 3) whose approved text shows on the client's `/agenda/[code]` page; pending lists for forms, deliveries and follow-ups; `/admin/script` with the operating script and the seven-day plan (`content/admin/`). Decision in [`docs/adr/2026-09-18-delivery-in-admin.md`](docs/adr/2026-09-18-delivery-in-admin.md).
-- Not built yet: payment gateway, gift codes (REG-01 sells via WhatsApp), the pre-session form itself (external until the legal texts are signed; the admin records that it arrived), notifications beyond the WhatsApp handoff.
+- Not built yet (in the order of the plan's section 12): interest capture with its table and admin lists (the "Avísame" and gift CTAs open WhatsApp meanwhile), campaigns "Encuentro 729" (`/encuentros/[codigo]`), Bre-B payment instructions and manual bookings from the admin, gift orders with voucher codes, CSV export and the operating guide. Deferred: survey, newsletter, payment gateway, the pre-session form itself (external until the legal texts are signed).
 
 Before public launch: fill the 19 `[POR CONFIRMAR]` markers in `content/terms.md` and `content/privacy.md` and get them reviewed (one names the fields the agenda stores), define gift conditions before REG-01 becomes bookable, set `NEXT_PUBLIC_SITE_URL` to the real host, add an OpenGraph image.
 
@@ -47,11 +48,11 @@ Node 20.9 or newer. CI runs lint, typecheck, DB tests, build and E2E on every pu
 ## Layout
 
 ```
-app/            routes (home, agenda, agenda/[code], admin, admin/bookings/[id], admin/script, contact, terms, privacy), server actions
-components/     brand/ (logo, CTAs), layout/ (top bar, footer, WhatsApp FAB), sections/, agenda/
+app/            routes (home, yo, yo/[slug], nosotros, nosotros/[slug], celebremos, empresas, regalar, agenda, agenda/[code], admin, admin/bookings/[id], admin/script, contact, terms, privacy), server actions
+components/     brand/ (logo, CTAs), layout/ (top bar, nav, footer, WhatsApp FAB), sections/, catalog/ (cards, line and service templates, gift block), agenda/
 content/        terms.md, privacy.md, contact.md, admin/ (script, week plan); all read at build time
 db/             Drizzle schema + lazy client; drizzle/ holds the SQL migrations
-lib/            site.ts, consultations.ts (catalog), agenda/ (time, availability, bookings, delivery), admin-auth
+lib/            site.ts, catalog.ts (services, lines, statuses), agenda/ (time, availability, bookings, delivery), admin-auth
 proxy.ts        Basic-auth challenge for /admin
 tests/db, e2e/  node:test DB tests; Playwright specs
 docs/adr/       current decisions; docs/archive/adr/ superseded ones

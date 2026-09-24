@@ -6,26 +6,13 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { track } from "@vercel/analytics";
 import { BadgeCheck, MapPin, MessageCircle } from "lucide-react";
+import { Badge, Button, Card, CardContent, Input, Label, cn } from "@saas/ui";
 import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  Input,
-  Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  cn,
-} from "@saas/ui";
-import {
-  BOOKABLE_CONSULTATIONS,
-  type Consultation,
-  findConsultation,
+  ACTIVE_SERVICES,
+  type SellableService,
+  findService,
   formatCOP,
-} from "@/lib/consultations";
+} from "@/lib/catalog";
 import { ROUTES, whatsappUrl } from "@/lib/site";
 import type { Slot } from "@/lib/agenda/availability";
 import {
@@ -95,10 +82,12 @@ export function AgendaFlow({ slots, holdHours }: { slots: Slot[]; holdHours: num
   const consultationParam = searchParams.get("consultation");
   const origin = searchParams.get("origen") ?? "";
 
-  const [consultation, setConsultation] = useState<Consultation>(() => {
-    const found = findConsultation(consultationParam);
-    return found?.bookable ? found : BOOKABLE_CONSULTATIONS[0];
-  });
+  // One product sells in October (plan section 1). The `consultation` param is
+  // kept for links and campaigns; anything not active falls back to YO-01.
+  const consultation = useMemo<SellableService>(() => {
+    const found = findService(consultationParam);
+    return found?.status === "active" ? found : ACTIVE_SERVICES[0];
+  }, [consultationParam]);
   const [cursorOverride, setCursorOverride] = useState<MonthCursor | null>(null);
   const [selectedDate, setSelectedDate] = useState<ISODate | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
@@ -133,7 +122,7 @@ export function AgendaFlow({ slots, holdHours }: { slots: Slot[]; holdHours: num
 
   if (state.status === "created") {
     const startsAt = new Date(state.startsAt);
-    const service = findConsultation(state.serviceId);
+    const service = findService(state.serviceId);
     const handoff = whatsappUrl(
       buildHandoffMessage({
         name: state.customerName,
@@ -241,30 +230,12 @@ export function AgendaFlow({ slots, holdHours }: { slots: Slot[]; holdHours: num
             </Badge>
 
             <div>
-              <Label
-                id="consultation-label"
-                className="text-xs font-bold uppercase tracking-wider text-violet-700"
-              >
+              <p className="text-xs font-bold uppercase tracking-wider text-violet-700">
                 Sesión
-              </Label>
-              <Select
-                value={consultation.id}
-                onValueChange={(v) => {
-                  const found = findConsultation(v);
-                  if (found?.bookable) setConsultation(found);
-                }}
-              >
-                <SelectTrigger aria-labelledby="consultation-label" className="mt-2 w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BOOKABLE_CONSULTATIONS.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              </p>
+              <p className="mt-1 font-semibold text-foreground" data-testid="agenda-service">
+                {consultation.name}
+              </p>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 {consultation.description}
               </p>
@@ -275,11 +246,6 @@ export function AgendaFlow({ slots, holdHours }: { slots: Slot[]; holdHours: num
               <p className="mt-1 text-sm text-muted-foreground">
                 Virtual, por Google Meet. {consultation.durationMinutes} minutos.
               </p>
-              {consultation.requiresPreviousSession && (
-                <p className="mt-2 rounded-lg bg-orange-50 px-3 py-2 text-xs text-brand-ink">
-                  Solo para quienes ya tuvieron su primera sesión.
-                </p>
-              )}
             </div>
           </CardContent>
         </Card>

@@ -7,7 +7,7 @@ import { findBookingByCode } from "@/lib/agenda/bookings";
 import { deliveryStage, findApprovedReport } from "@/lib/agenda/delivery";
 import { BOGOTA, formatInZone } from "@/lib/agenda/time";
 import { STAGE_LABEL, STATUS_LABEL } from "@/lib/agenda/labels";
-import { findConsultation, formatCOP } from "@/lib/consultations";
+import { findService, formatCOP } from "@/lib/catalog";
 import { whatsappUrl } from "@/lib/site";
 import { Prose } from "@/components/sections/prose";
 
@@ -35,7 +35,7 @@ export default async function BookingStatusPage({
   // Only an approved report leaves the admin; drafts never reach this page.
   const report = booking.attendedAt ? await findApprovedReport(booking.id) : null;
   const stage = deliveryStage(booking, report);
-  const service = findConsultation(booking.serviceId);
+  const service = findService(booking.serviceId);
   const info = stage === "attended" || stage === "delivered" ? STAGE_LABEL[stage] : STATUS_LABEL[stage];
 
   return (
