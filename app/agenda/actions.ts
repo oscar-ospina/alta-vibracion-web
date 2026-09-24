@@ -4,6 +4,7 @@ import { hasDatabase } from "@/db/client";
 import { createBooking } from "@/lib/agenda/bookings";
 import { isValidTimeZone } from "@/lib/agenda/time";
 import { contactError, isContactChannel, isValidContact, normalizeContact } from "@/lib/contact";
+import { type PaymentInstructions, paymentInstructions } from "@/lib/payment";
 
 export type BookingFormState =
   | { status: "idle" }
@@ -18,6 +19,8 @@ export type BookingFormState =
       priceCop: number;
       /** A redeemed gift: confirmed on creation, nothing to pay. */
       gift: boolean;
+      /** How to pay, handed over only once the booking exists; null for a gift or without a key. */
+      payment: PaymentInstructions | null;
     };
 
 function str(formData: FormData, key: string): string {
@@ -100,5 +103,6 @@ export async function submitBooking(
     clientTimeZone: b.clientTimeZone,
     priceCop: b.priceCop,
     gift: Boolean(b.giftOrderId),
+    payment: b.giftOrderId ? null : paymentInstructions(),
   };
 }

@@ -68,7 +68,13 @@ describe("gift orders", () => {
     assert.equal(booking.booking.giftOrderId, created.order.id);
     assert.equal((await redeemableGift(created.order.code)).state, "redeemed");
     assert.equal((await listGiftsToSchedule()).length, 0);
+    // A redeemed order is managed through its booking: no cancel, no refund from here.
     assert.deepEqual(await setGiftStatus(created.order.id, "cancelled"), { ok: false, error: "bad_transition" });
+    assert.deepEqual(await setGiftStatus(created.order.id, "refunded"), { ok: false, error: "bad_transition" });
+  });
+
+  it("rejects a price out of bounds", async () => {
+    assert.deepEqual(await createGiftOrder({ ...buyer, priceCop: 1_499_000_000, paid: true }), { ok: false, error: "bad_values" });
   });
 
   it("a voucher is redeemed once, and only while paid", async () => {
@@ -97,26 +103,25 @@ describe("gift orders", () => {
     assert.deepEqual(await createBooking(beneficiary(b.startsAt, "RG-NOPE1234")), { ok: false, error: "gift_unavailable" });
   });
 
-  it("a cancelled redemption booking frees the voucher for a manual re-booking only through the admin", async () => {
+  it("cancelling the redemption booking gives the voucher back, so the beneficiary can pick another time", async () => {
     const created = await createGiftOrder({ ...buyer, priceCop: 149900, paid: true });
     assert.ok(created.ok);
     const [slot, other] = await loadAvailability();
     const first = await createBooking(beneficiary(slot.startsAt, created.order.code));
     assert.ok(first.ok);
     assert.ok((await setBookingStatus(first.booking.id, "cancelled")).ok);
-    // The order stays redeemed (the money moved once); Liliana re-books by hand without the code.
+    // The sale stands; the voucher is paid and unscheduled again.
+    assert.equal((await redeemableGift(created.order.code)).state, "ready");
+    assert.equal((await listGiftsToSchedule()).length, 1);
+    const again = await createBooking(beneficiary(other.startsAt, created.order.code));
+    assert.ok(again.ok);
+    assert.equal(again.booking.giftOrderId, created.order.id);
     assert.equal((await redeemableGift(created.order.code)).state, "redeemed");
-    const rebooked = await createManualBooking({
-      customerName: "Beneficiaria",
-      contactChannel: "whatsapp",
-      contactValue: "573009990009",
-      date: other.date,
-      time: other.time,
-      priceCop: 0,
-      paid: true,
-      note: `regalo-${created.order.code}`,
-    });
-    assert.ok(rebooked.ok);
+    // Only a paid, unscheduled voucher can be refunded.
+    assert.ok((await setBookingStatus(again.booking.id, "cancelled")).ok);
+    const refunded = await setGiftStatus(created.order.id, "refunded");
+    assert.ok(refunded.ok);
+    assert.deepEqual(await createBooking(beneficiary(slot.startsAt, created.order.code)), { ok: false, error: "gift_unavailable" });
   });
 
   it("starts an order from an inquiry with the buyer's data and marks the inquiry contacted", async () => {
@@ -134,7 +139,7 @@ describe("gift orders", () => {
     assert.ok(res.ok);
     assert.equal(res.order.buyerName, "Ana");
     assert.equal(res.order.buyerContactValue, "ana@example.com");
-    assert.equal(res.order.message, "Para mi hermana");
+    assert.equal(res.order.message, null, "the note to Liliana is not the dedication the beneficiary reads");
     assert.equal(res.order.priceCop, 149900);
     assert.equal(res.order.status, "pending_payment");
     const [row] = await db.select().from(schema.interests).where(eq(schema.interests.id, interest.interest.id));
@@ -148,7 +153,7 @@ describe("gift orders", () => {
     for (let i = 0; i < free + 1; i++) {
       assert.ok((await createGiftOrder({ ...buyer, buyerContactValue: `5730011100${i}`, priceCop: 149900, paid: true })).ok);
     }
-    const before = await giftCapacity(now);
+    const before = await giftCapacity(await listGiftsToSchedule(), now);
     assert.equal(before.unscheduled, free + 1);
     assert.ok(before.short);
 
@@ -168,7 +173,7 @@ describe("gift orders", () => {
     assert.equal(manual.booking.status, "confirmed");
     assert.equal(manual.booking.priceCop, 0);
     assert.equal(manual.booking.giftOrderId, order.id);
-    const after = await giftCapacity(now);
+    const after = await giftCapacity(await listGiftsToSchedule(), now);
     assert.equal(after.unscheduled, free);
   });
 
@@ -188,6 +193,14 @@ describe("gift orders", () => {
     assert.ok(gift.ok);
     assert.equal(gift.order.priceCop, 98900, "the campaign price applies");
     assert.equal(await countPromoUsed(withGifts.campaign.id), 1);
+    // A registered buyer finds the cupo gone, decided under the lock too.
+    const [slot] = await loadAvailability();
+    const reg = await saveInterest({ kind: "campaign", serviceId: "yo-01", campaignId: withGifts.campaign.id, preferredName: "P", contactChannel: "whatsapp", contactValue: "573001110009", consent: true });
+    assert.ok(reg.ok);
+    assert.deepEqual(
+      await createBooking({ ...beneficiary(slot.startsAt, null, "573001110009"), campaignCode: withGifts.campaign.code }),
+      { ok: false, error: "campaign_sold_out" },
+    );
     assert.deepEqual(
       await createGiftOrder({ ...buyer, priceCop: 149900, paid: true, campaignId: withGifts.campaign.id }),
       { ok: false, error: "campaign_unavailable" },

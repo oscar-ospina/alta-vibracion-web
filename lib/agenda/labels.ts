@@ -4,7 +4,7 @@ import type { BookingStatus } from "@/db/schema";
 export const STATUS_LABEL: Record<BookingStatus, { label: string; hint: string }> = {
   pending_payment: {
     label: "Pendiente de pago",
-    hint: "Tu horario está reservado mientras Liliana verifica el pago. Cuando pagues, envíale tu código por WhatsApp.",
+    hint: "Tu horario está reservado mientras Liliana verifica el pago. Escríbele por WhatsApp con tu código: te comparte los datos de pago si aún no los tienes y confirma cuando vea la transferencia.",
   },
   confirmed: {
     label: "Confirmada",
@@ -66,7 +66,7 @@ export const ADMIN_NOTICE = {
   manual_past: "La fecha y hora ya pasaron.",
   gift_not_found: "Esa orden de regalo no existe.",
   gift_bad_values: "Revisa los valores: nombre, contacto y precio.",
-  gift_bad_transition: "Esa orden no admite ese cambio de estado (una orden canjeada se gestiona desde su reserva).",
+  gift_bad_transition: "Esa orden no admite ese cambio de estado. Una orden canjeada se gestiona desde su reserva: cancelarla devuelve el bono a «pagado».",
   gift_campaign_unavailable: "Esa campaña no permite regalos, no está activa o no tiene cupos.",
   gift_unavailable: "Ese bono no está pagado o no existe.",
   gift_used: "Ese bono ya fue canjeado.",

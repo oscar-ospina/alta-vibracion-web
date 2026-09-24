@@ -14,7 +14,7 @@ import {
   type BookingWithReport,
 } from "@/lib/agenda/delivery";
 import { BOGOTA, formatInZone, formatLongDate, todayInBogota } from "@/lib/agenda/time";
-import { bookingServiceLabel, formatCOP } from "@/lib/catalog";
+import { FIRST_SESSION, bookingServiceLabel, formatCOP } from "@/lib/catalog";
 import { displayContact } from "@/lib/contact";
 import { REPORT_STATUS_LABEL, STAGE_LABEL, STATUS_LABEL, adminNotice } from "@/lib/agenda/labels";
 import { addOverride, cancelBooking, confirmBooking, createManualBookingAction, deleteOverride } from "./actions";
@@ -259,7 +259,7 @@ export default async function AdminPage({
             </div>
             <div>
               <Label htmlFor="mb-price">Precio (COP, 0 si es un regalo ya pagado)</Label>
-              <Input id="mb-price" name="priceCop" type="number" min={0} defaultValue={149900} required className="mt-2" />
+              <Input id="mb-price" name="priceCop" type="number" min={0} defaultValue={FIRST_SESSION.price} required className="mt-2" />
             </div>
             <div>
               <Label htmlFor="mb-note">Nota de origen (opcional, sin espacios)</Label>

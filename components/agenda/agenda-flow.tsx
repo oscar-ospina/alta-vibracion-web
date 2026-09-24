@@ -30,7 +30,6 @@ import {
 } from "@/lib/agenda/calendar";
 import { MonthCalendar } from "@/components/agenda/month-calendar";
 import { PaymentBox } from "@/components/agenda/payment-box";
-import type { PaymentInstructions } from "@/lib/payment";
 import { TimeZoneSelect, detectTimeZone } from "@/components/agenda/timezone-select";
 import { type BookingFormState, submitBooking } from "@/app/agenda/actions";
 
@@ -94,13 +93,14 @@ export function AgendaFlow({
   holdHours,
   offer = null,
   voucher = null,
-  payment = null,
+  brebAvailable = false,
 }: {
   slots: Slot[];
   holdHours: number;
   offer?: CampaignOffer | null;
   voucher?: GiftVoucher | null;
-  payment?: PaymentInstructions | null;
+  /** Whether a Bre-B key is configured. The key itself arrives with the created booking, never before. */
+  brebAvailable?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -175,9 +175,8 @@ export function AgendaFlow({
             <>
               <p className="text-muted-foreground">
                 Guardamos tu horario por {holdHours} horas mientras Liliana verifica el pago.
-                La cita queda confirmada cuando ella verifique la transferencia.
               </p>
-              <PaymentBox instructions={payment} amountCop={state.priceCop} code={state.code} />
+              <PaymentBox instructions={state.payment} amountCop={state.priceCop} code={state.code} />
             </>
           )}
           <dl className="space-y-1 rounded-xl bg-orange-50 p-4 text-sm">
@@ -203,10 +202,12 @@ export function AgendaFlow({
                 </dd>
               </div>
             )}
-            <div className="flex justify-between gap-4">
-              <dt className="font-semibold text-foreground">Valor</dt>
-              <dd className="text-right">{state.gift ? "Regalo" : formatCOP(state.priceCop)}</dd>
-            </div>
+            {state.gift && (
+              <div className="flex justify-between gap-4">
+                <dt className="font-semibold text-foreground">Valor</dt>
+                <dd className="text-right">Regalo</dd>
+              </div>
+            )}
             <div className="flex justify-between gap-4">
               <dt className="font-semibold text-foreground">Estado</dt>
               <dd data-testid="created-status">{state.gift ? "Confirmada" : "Pendiente de pago"}</dd>
@@ -383,7 +384,7 @@ export function AgendaFlow({
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                {payment ? "Pago por Bre-B; verás la llave al reservar." : "Pago por transferencia. Lili te envía los datos."}
+                {brebAvailable ? "Pago por Bre-B; verás la llave al reservar." : "Pago por transferencia. Lili te envía los datos por WhatsApp."}
               </p>
             )}
           </div>

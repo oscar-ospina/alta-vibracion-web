@@ -21,8 +21,8 @@ export function PaymentBox({
   if (!instructions) {
     return (
       <p className="text-sm text-muted-foreground" data-testid="payment-manual">
-        Lili te envía los datos de pago por el canal que elegiste. La cita queda confirmada
-        cuando ella verifique la transferencia.
+        Escríbele a Lili por WhatsApp con tu código: ella te envía los datos de pago y confirma
+        la cita cuando verifique la transferencia.
       </p>
     );
   }

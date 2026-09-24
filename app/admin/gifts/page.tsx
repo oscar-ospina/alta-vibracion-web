@@ -10,7 +10,7 @@ import { FIRST_SESSION, formatCOP } from "@/lib/catalog";
 import { displayContact } from "@/lib/contact";
 import { type GiftCapacity, giftCapacity, listGiftOrders, listGiftsToSchedule } from "@/lib/gifts";
 import { SITE_URL } from "@/lib/site";
-import { createGiftOrderAction, setGiftStatusAction } from "../actions";
+import { createGiftOrderAction, setGiftStatusAction, updateGiftMessageAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,7 @@ function GiftRow({ g }: { g: GiftOrder }) {
               <Button size="sm" variant="outline" type="submit">Cancelar</Button>
             </form>
           )}
-          {(g.status === "paid" || g.status === "redeemed") && (
+          {g.status === "paid" && (
             <form action={setGiftStatusAction}>
               <input type="hidden" name="id" value={g.id} />
               <input type="hidden" name="status" value="refunded" />
@@ -60,8 +60,18 @@ function GiftRow({ g }: { g: GiftOrder }) {
       </div>
       <p className="mt-1 text-muted-foreground">
         Invitación para compartir: <code className="font-mono" data-testid="gift-link">{link}</code>
-        {g.message && <span className="block">Mensaje: {g.message}</span>}
       </p>
+      {g.status !== "redeemed" && (
+        <form action={updateGiftMessageAction} className="mt-2 flex flex-wrap items-end gap-2">
+          <input type="hidden" name="id" value={g.id} />
+          <div className="min-w-64 flex-1">
+            <Label htmlFor={`msg-${g.id}`}>Mensaje que lee quien recibe el regalo (opcional)</Label>
+            <Input id={`msg-${g.id}`} name="message" defaultValue={g.message ?? ""} maxLength={500} className="mt-1" />
+          </div>
+          <Button size="sm" variant="outline" type="submit">Guardar mensaje</Button>
+        </form>
+      )}
+      {g.status === "redeemed" && g.message && <p className="mt-1 text-muted-foreground">Mensaje: {g.message}</p>}
     </li>
   );
 }
@@ -96,7 +106,8 @@ export default async function AdminGiftsPage({
     giftCampaigns = campaigns
       .filter((s) => s.view === "active" && s.campaign.allowsGift)
       .map((s) => ({ id: s.campaign.id, name: s.campaign.name, priceCop: s.campaign.priceCop }));
-    [orders, toSchedule, capacity] = await Promise.all([listGiftOrders(), listGiftsToSchedule(), giftCapacity(now)]);
+    [orders, toSchedule] = await Promise.all([listGiftOrders(), listGiftsToSchedule()]);
+    capacity = await giftCapacity(toSchedule, now);
   } catch (err) {
     console.error("admin: gifts unavailable", err);
     return (

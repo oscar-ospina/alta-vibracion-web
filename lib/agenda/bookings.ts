@@ -9,10 +9,10 @@ import { and, count, eq, gt, gte, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { EXCLUSION_VIOLATION, UNIQUE_VIOLATION, pgError } from "@/db/errors";
 import type { Booking } from "@/db/schema";
-import { findService } from "@/lib/catalog";
+import { FIRST_SESSION, findService } from "@/lib/catalog";
 import { countPromoUsed, findCampaignByCode, isRegistered, lockAndViewCampaign, viewOf } from "@/lib/campaigns";
 import { findGiftByCode, lockGiftRow } from "@/lib/gifts";
-import { loadAvailability } from "./availability";
+import { loadAvailability, ruleDurationMinutes } from "./availability";
 import { BOGOTA, addMinutes, bogotaInstant } from "./time";
 
 /** Unambiguous alphabet (no 0/O, 1/I). */
@@ -64,6 +64,8 @@ class SoldOut extends Error {}
 class CampaignGone extends Error {}
 /** Thrown inside the booking transaction when the voucher was redeemed a moment earlier. */
 class GiftUsed extends Error {}
+/** Thrown inside the booking transaction when the voucher was cancelled or refunded a moment earlier. */
+class GiftGone extends Error {}
 
 type Tx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
 
@@ -75,7 +77,8 @@ type Tx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
 async function redeemGiftInTx(tx: Tx, giftOrderId: string, now: Date) {
   await tx.execute(lockGiftRow(giftOrderId));
   const [order] = await tx.select().from(schema.giftOrders).where(eq(schema.giftOrders.id, giftOrderId)).limit(1);
-  if (order?.status !== "paid") throw new GiftUsed();
+  if (order?.status === "redeemed") throw new GiftUsed();
+  if (order?.status !== "paid") throw new GiftGone();
   await tx
     .update(schema.giftOrders)
     .set({ status: "redeemed", redeemedAt: now, updatedAt: now })
@@ -204,6 +207,7 @@ export async function createBooking(
       if (err instanceof SoldOut) return { ok: false, error: "campaign_sold_out" };
       if (err instanceof CampaignGone) return { ok: false, error: "campaign_unavailable" };
       if (err instanceof GiftUsed) return { ok: false, error: "gift_used" };
+      if (err instanceof GiftGone) return { ok: false, error: "gift_unavailable" };
       const pgErr = pgError(err);
       // Unique (same start) or exclusion (overlapping range): the slot is taken.
       if (pgErr?.code !== UNIQUE_VIOLATION && pgErr?.code !== EXCLUSION_VIOLATION) throw err;
@@ -226,7 +230,6 @@ export type ManualBookingInput = {
   priceCop: number;
   /** Liliana already verified the payment (late transfer, gift redemption). */
   paid: boolean;
-  campaignId?: string | null;
   note?: string | null;
   /** Redeem this paid voucher: the booking is confirmed, price 0, the order becomes redeemed. */
   giftCode?: string | null;
@@ -261,9 +264,7 @@ export async function createManualBooking(
     if (gift.status === "redeemed") return { ok: false, error: "gift_used" };
     if (gift.status !== "paid") return { ok: false, error: "gift_unavailable" };
   }
-  const rules = await db.select().from(schema.availabilityRules);
-  const durationMinutes = rules[0]?.durationMinutes ?? 135;
-  const endsAt = addMinutes(startsAt, durationMinutes);
+  const endsAt = addMinutes(startsAt, await ruleDurationMinutes());
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const code = generateBookingCode();
@@ -276,9 +277,8 @@ export async function createManualBooking(
           .insert(schema.bookings)
           .values({
             code,
-            serviceId: "yo-01",
+            serviceId: FIRST_SESSION.id,
             priceCop: gift ? 0 : input.priceCop,
-            campaignId: input.campaignId ?? null,
             giftOrderId: gift?.id ?? null,
             startsAt,
             endsAt,
@@ -299,6 +299,7 @@ export async function createManualBooking(
       return { ok: true, booking };
     } catch (err) {
       if (err instanceof GiftUsed) return { ok: false, error: "gift_used" };
+      if (err instanceof GiftGone) return { ok: false, error: "gift_unavailable" };
       const pgErr = pgError(err);
       if (pgErr?.code !== UNIQUE_VIOLATION && pgErr?.code !== EXCLUSION_VIOLATION) throw err;
       if (pgErr.constraint === "bookings_code_idx") continue;
@@ -366,20 +367,31 @@ export async function setBookingStatus(
   }
 
   try {
-    const [row] = await db
-      .update(schema.bookings)
-      .set({
-        status,
-        updatedAt: now,
-        confirmedAt: status === "confirmed" ? now : sql`${schema.bookings.confirmedAt}`,
-      })
-      .where(
-        and(
-          eq(schema.bookings.id, id),
-          eq(schema.bookings.status, current.status),
-        ),
-      )
-      .returning();
+    const row = await db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(schema.bookings)
+        .set({
+          status,
+          updatedAt: now,
+          confirmedAt: status === "confirmed" ? now : sql`${schema.bookings.confirmedAt}`,
+        })
+        .where(
+          and(
+            eq(schema.bookings.id, id),
+            eq(schema.bookings.status, current.status),
+          ),
+        )
+        .returning();
+      // Cancelling a gift's booking gives the voucher back: the sale stands,
+      // the beneficiary picks another time (plan section 7.1, changes).
+      if (updated && status === "cancelled" && updated.giftOrderId) {
+        await tx
+          .update(schema.giftOrders)
+          .set({ status: "paid", redeemedAt: null, updatedAt: now })
+          .where(and(eq(schema.giftOrders.id, updated.giftOrderId), eq(schema.giftOrders.status, "redeemed")));
+      }
+      return updated;
+    });
     if (!row) return { ok: false, error: "not_pending" };
     return { ok: true, booking: row };
   } catch (err) {

@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { ADMIN_PASSWORD, ADMIN_USER, resetAgenda } from "./helpers";
 import { createBooking } from "../lib/agenda/bookings";
 import { loadAvailability } from "../lib/agenda/availability";
+import { addDays, todayInBogota, weekdayOf } from "../lib/agenda/time";
 
 test.beforeEach(async () => {
   await resetAgenda();
@@ -67,10 +68,9 @@ test("admin creates a booking by hand, confirmed, and the public agenda loses th
   const page = await context.newPage();
   await page.goto("/admin");
   const form = page.getByTestId("manual-booking-form");
-  // A date the rules offer: the first Monday at least a week ahead.
-  const d = new Date();
-  d.setDate(d.getDate() + ((8 - d.getDay()) % 7) + 7);
-  const date = d.toISOString().slice(0, 10);
+  // A date the rules offer: the first Monday (Bogotá calendar) at least a week ahead.
+  let date = addDays(todayInBogota(), 7);
+  while (weekdayOf(date) !== 1) date = addDays(date, 1);
   await form.getByLabel("Nombre").fill("Reserva Manual");
   await form.getByLabel("Contacto").fill("+57 300 555 0000");
   await form.getByLabel("Fecha").fill(date);

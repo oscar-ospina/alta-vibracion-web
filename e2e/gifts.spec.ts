@@ -19,7 +19,7 @@ test("from the gift inquiry to a confirmed session for the beneficiary, with a s
   const form = page.getByTestId("interest-form");
   await form.getByLabel("Tu nombre").fill("Carlos Regala");
   await form.getByLabel("Tu número de WhatsApp").fill("+57 300 111 0001");
-  await form.getByLabel(/Mensaje o dedicatoria/).fill("Para que te conozcas un poco más.");
+  await form.getByLabel(/Mensaje o dedicatoria/).fill("¿Puedo pagar la semana que viene?");
   await form.getByRole("checkbox").check();
   await form.getByRole("button", { name: "Quiero regalar esta experiencia" }).click();
   await expect(page.getByTestId("interest-saved")).toBeVisible();
@@ -44,7 +44,12 @@ test("from the gift inquiry to a confirmed session for the beneficiary, with a s
   await expect(page.getByTestId("campaign-notice")).toContainText("aún no está confirmado");
   await expect(page.getByTestId("agenda-price")).toHaveText("COP 149.900");
 
-  await row.getByRole("button", { name: "Pago verificado" }).click();
+  // The note to Liliana never reaches the invitation; the dedication is set by hand.
+  await expect(row).not.toContainText("¿Puedo pagar");
+  await row.getByLabel(/Mensaje que lee quien recibe/).fill("Para que te conozcas un poco más.");
+  await row.getByRole("button", { name: "Guardar mensaje" }).click();
+  await expect(admin.getByTestId("admin-notice")).toHaveText("Guardado.");
+  await admin.getByTestId("gift-orders").getByTestId("gift-row").first().getByRole("button", { name: "Pago verificado" }).click();
   await expect(admin.getByTestId("admin-notice")).toHaveText("Guardado.");
   await expect(admin.getByTestId("gifts-to-schedule").getByTestId("gift-row")).toHaveCount(1);
   await expect(admin.getByTestId("gift-capacity")).toContainText("Bonos pagados sin horario: 1");

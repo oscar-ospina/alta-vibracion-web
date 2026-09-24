@@ -5,12 +5,13 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdmin } from "@/lib/admin-auth-server";
+import { ruleDurationMinutes } from "@/lib/agenda/availability";
 import { createManualBooking, setBookingStatus } from "@/lib/agenda/bookings";
 import { isContactChannel, isValidContact, normalizeContact } from "@/lib/contact";
 import { markAttended, markFollowUpDone, markIntakeReceived, saveReport } from "@/lib/agenda/delivery";
 import { setInterestStatus } from "@/lib/interests";
 import { activateCampaign, closeCampaign, createCampaign } from "@/lib/campaigns";
-import { createGiftFromInterest, createGiftOrder, setGiftStatus } from "@/lib/gifts";
+import { createGiftFromInterest, createGiftOrder, setGiftStatus, updateGiftMessage } from "@/lib/gifts";
 import { HHMM_RE, ISO_DATE_RE, addDays, bogotaInstant, weekdayOf } from "@/lib/agenda/time";
 import type { AdminNoticeKey } from "@/lib/agenda/labels";
 
@@ -60,7 +61,7 @@ export async function addOverride(formData: FormData) {
     // Same length as the regular slots, so an extra morning protects the same time.
     const db = getDb();
     const rules = await db.select().from(schema.availabilityRules);
-    durationMinutes = rules[0]?.durationMinutes ?? 135;
+    durationMinutes = await ruleDurationMinutes();
     const start = bogotaInstant(date, time).getTime();
     const end = start + durationMinutes * 60_000;
     const sameDay = [
@@ -209,7 +210,9 @@ export async function createManualBookingAction(formData: FormData) {
   const contactRaw = String(formData.get("contactValue") ?? "").trim().slice(0, 120);
   const date = String(formData.get("date") ?? "");
   const time = String(formData.get("time") ?? "").trim();
-  const priceCop = Number(formData.get("priceCop"));
+  const priceRaw = String(formData.get("priceCop") ?? "").trim();
+  if (!/^\d{1,9}$/.test(priceRaw)) notify("manual_bad_values");
+  const priceCop = Number(priceRaw);
   const paid = formData.get("paid") === "on";
   const note = String(formData.get("note") ?? "").trim().slice(0, 40) || null;
   const giftCode = String(formData.get("giftCode") ?? "").trim().toUpperCase().slice(0, 12) || null;
@@ -257,12 +260,14 @@ export async function createGiftOrderAction(formData: FormData) {
   if (!isContactChannel(channel) || !isValidContact(channel, contactRaw)) notifyGifts("manual_bad_contact");
   const campaignId = String(formData.get("campaignId") ?? "").trim();
   if (campaignId && !UUID_RE.test(campaignId)) notifyGifts("gift_campaign_unavailable");
+  const priceRaw = String(formData.get("priceCop") ?? "").trim();
+  if (!/^\d{1,9}$/.test(priceRaw)) notifyGifts("gift_bad_values");
   const res = await createGiftOrder({
     buyerName: String(formData.get("buyerName") ?? "").slice(0, 80),
     buyerContactChannel: channel,
     buyerContactValue: normalizeContact(channel, contactRaw),
     message: String(formData.get("message") ?? "").slice(0, 500),
-    priceCop: Number(formData.get("priceCop")),
+    priceCop: Number(priceRaw),
     campaignId: campaignId || null,
     conditions: String(formData.get("conditions") ?? "").slice(0, 2000),
     paid: formData.get("paid") === "on",
@@ -289,4 +294,12 @@ export async function setGiftStatusAction(formData: FormData) {
   const res = UUID_RE.test(id) ? await setGiftStatus(id, status) : ({ ok: false, error: "not_found" } as const);
   revalidatePath("/admin");
   notifyGifts(res.ok ? "saved" : res.error === "not_found" ? "gift_not_found" : "gift_bad_transition");
+}
+
+export async function updateGiftMessageAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const message = String(formData.get("message") ?? "").slice(0, 500);
+  const res = UUID_RE.test(id) ? await updateGiftMessage(id, message) : ({ ok: false, error: "not_found" } as const);
+  notifyGifts(res.ok ? "saved" : "gift_not_found");
 }

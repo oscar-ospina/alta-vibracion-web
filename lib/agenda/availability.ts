@@ -2,7 +2,7 @@
  * Availability = weekly rules + per-date overrides − slots blocked by bookings.
  * Pure `computeSlots` is unit-tested; `loadAvailability` wires it to the DB.
  */
-import { and, gte, inArray, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import type {
   AvailabilityOverride,
@@ -18,6 +18,20 @@ import {
   todayInBogota,
   weekdayOf,
 } from "./time";
+
+/** Minutes a slot protects when no rule says otherwise (plan section 7: 18:00 to 20:15 while sessions run two hours). */
+export const DEFAULT_DURATION_MINUTES = 135;
+
+/** The duration the weekly rules use, so extras and manual bookings protect the same time. */
+export async function ruleDurationMinutes(): Promise<number> {
+  const [rule] = await getDb()
+    .select({ durationMinutes: schema.availabilityRules.durationMinutes })
+    .from(schema.availabilityRules)
+    .where(eq(schema.availabilityRules.active, true))
+    .orderBy(schema.availabilityRules.weekday, schema.availabilityRules.time)
+    .limit(1);
+  return rule?.durationMinutes ?? DEFAULT_DURATION_MINUTES;
+}
 
 /** Earliest bookable day is tomorrow (Bogotá). Same-day requests go to WhatsApp. */
 export const LEAD_DAYS = 1;
@@ -79,7 +93,7 @@ export function computeSlots(args: {
       if (r.active && r.weekday === weekday) candidates.set(r.time, r.durationMinutes);
     }
     for (const o of dayOverrides) {
-      if (o.kind === "extra" && o.time) candidates.set(o.time, o.durationMinutes ?? 135);
+      if (o.kind === "extra" && o.time) candidates.set(o.time, o.durationMinutes ?? DEFAULT_DURATION_MINUTES);
     }
     let lastEnd = 0;
     for (const [time, durationMinutes] of [...candidates].sort()) {

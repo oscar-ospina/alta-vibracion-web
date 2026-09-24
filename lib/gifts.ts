@@ -10,12 +10,12 @@
  * the next 30 days (decided 2026-09-23: a warning, never a hard block).
  */
 import { randomBytes } from "node:crypto";
-import { and, count, desc, eq, inArray, notExists, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, notExists, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { UNIQUE_VIOLATION, pgError } from "@/db/errors";
 import type { GiftOrder } from "@/db/schema";
 import { loadAvailability } from "@/lib/agenda/availability";
-import { countPromoUsed, findCampaignById, viewOf } from "@/lib/campaigns";
+import { MAX_PRICE_COP, lockAndViewCampaign } from "@/lib/campaigns";
 import { FIRST_SESSION } from "@/lib/catalog";
 import type { ContactChannel } from "@/lib/contact";
 
@@ -53,20 +53,27 @@ export async function createGiftOrder(
   input: CreateGiftOrderInput,
   now: Date = new Date(),
 ): Promise<CreateGiftOrderResult> {
-  if (input.buyerName.trim().length < 2 || !Number.isInteger(input.priceCop) || input.priceCop < 0) {
+  if (
+    input.buyerName.trim().length < 2 ||
+    !Number.isInteger(input.priceCop) ||
+    input.priceCop < 0 ||
+    input.priceCop > MAX_PRICE_COP
+  ) {
     return { ok: false, error: "bad_values" };
-  }
-  let priceCop = input.priceCop;
-  if (input.campaignId) {
-    const c = await findCampaignById(input.campaignId);
-    if (!c || !c.allowsGift) return { ok: false, error: "campaign_unavailable" };
-    if (viewOf(c, await countPromoUsed(c.id, now), now) !== "active") return { ok: false, error: "campaign_unavailable" };
-    priceCop = c.priceCop;
   }
   const db = getDb();
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const [row] = await db
+      const row = await db.transaction(async (tx) => {
+        // A gift at the campaign price takes a promo cupo, decided under the
+        // campaign's row lock like a booking does (plan: "mismo consumo de capacidad").
+        let priceCop = input.priceCop;
+        if (input.campaignId) {
+          const locked = await lockAndViewCampaign(tx, input.campaignId, now);
+          if (!locked || !locked.campaign.allowsGift || locked.view !== "active") throw new CampaignUnavailable();
+          priceCop = locked.campaign.priceCop;
+        }
+        const [inserted] = await tx
         .insert(schema.giftOrders)
         .values({
           code: generateGiftCode(),
@@ -85,18 +92,25 @@ export async function createGiftOrder(
           updatedAt: now,
         })
         .returning();
+        return inserted;
+      });
       return { ok: true, order: row };
     } catch (err) {
+      if (err instanceof CampaignUnavailable) return { ok: false, error: "campaign_unavailable" };
       if (pgError(err)?.code !== UNIQUE_VIOLATION) throw err;
     }
   }
   throw new Error("could not allocate a unique gift code");
 }
 
+class CampaignUnavailable extends Error {}
+
 /**
- * Start an order from an inquiry on /regalar: the buyer's data is copied,
- * the price is the general one until Liliana edits it, the inquiry is marked
- * contacted. Payment is still to be verified.
+ * Start an order from an inquiry on /regalar: the buyer's name and contact
+ * are copied, the price is the general one, the inquiry is marked contacted.
+ * The inquiry's free text is NOT copied: it was written to Liliana, and the
+ * order's message is what the beneficiary reads. Payment is still to be
+ * verified.
  */
 export async function createGiftFromInterest(
   interestId: string,
@@ -114,7 +128,7 @@ export async function createGiftFromInterest(
       buyerName: interest.preferredName,
       buyerContactChannel: interest.contactChannel,
       buyerContactValue: interest.contactValue,
-      message: interest.message,
+      message: null,
       priceCop: FIRST_SESSION.price,
       interestId: interest.id,
       conditions: "",
@@ -177,9 +191,23 @@ export async function listGiftsToSchedule(): Promise<GiftOrder[]> {
 export type GiftCapacity = { unscheduled: number; freeSlots: number; short: boolean };
 
 /** Paid vouchers without a slot against the slots still free in the public horizon. */
-export async function giftCapacity(now: Date = new Date()): Promise<GiftCapacity> {
-  const [unscheduled, slots] = await Promise.all([listGiftsToSchedule(), loadAvailability(now)]);
-  return { unscheduled: unscheduled.length, freeSlots: slots.length, short: unscheduled.length > slots.length };
+export async function giftCapacity(toSchedule: GiftOrder[], now: Date = new Date()): Promise<GiftCapacity> {
+  const slots = await loadAvailability(now);
+  return { unscheduled: toSchedule.length, freeSlots: slots.length, short: toSchedule.length > slots.length };
+}
+
+/** The dedication the beneficiary reads; editable until the voucher is redeemed. */
+export async function updateGiftMessage(
+  id: string,
+  message: string,
+  now: Date = new Date(),
+): Promise<{ ok: true; order: GiftOrder } | { ok: false; error: "not_found" }> {
+  const [row] = await getDb()
+    .update(schema.giftOrders)
+    .set({ message: message.trim() || null, updatedAt: now })
+    .where(eq(schema.giftOrders.id, id))
+    .returning();
+  return row ? { ok: true, order: row } : { ok: false, error: "not_found" };
 }
 
 export type SetGiftStatusResult =
@@ -187,9 +215,10 @@ export type SetGiftStatusResult =
   | { ok: false; error: "not_found" | "bad_transition" };
 
 /**
- * Admin transitions. Paid only from pending; cancelled from pending or paid
- * (a redeemed voucher has a booking, cancel that instead); refunded from paid
- * or redeemed, as a record of money going back.
+ * Admin transitions. Paid only from pending; cancelled from pending or paid;
+ * refunded from paid. A redeemed voucher has a booking: cancelling that
+ * booking returns the order to paid, and only then can it be refunded or
+ * cancelled. So the money and the session never disagree.
  */
 export async function setGiftStatus(
   id: string,
@@ -199,7 +228,7 @@ export async function setGiftStatus(
   const allowed: Record<typeof status, GiftOrder["status"][]> = {
     paid: ["pending_payment"],
     cancelled: ["pending_payment", "paid"],
-    refunded: ["paid", "redeemed"],
+    refunded: ["paid"],
   };
   const [row] = await getDb()
     .update(schema.giftOrders)
@@ -229,17 +258,4 @@ export async function redeemableGift(code: string): Promise<RedeemableGift> {
 /** Lock the order row inside the booking transaction so a voucher is redeemed once. */
 export const lockGiftRow = (id: string) => sql`select id from gift_orders where id = ${id} for update`;
 
-/** Promo cupos a campaign's gift orders take (plan: "mismo consumo de capacidad"). */
-export async function countCampaignGifts(campaignId: string): Promise<number> {
-  const [{ n }] = await getDb()
-    .select({ n: count() })
-    .from(schema.giftOrders)
-    .where(
-      and(
-        eq(schema.giftOrders.campaignId, campaignId),
-        inArray(schema.giftOrders.status, ["pending_payment", "paid", "redeemed"]),
-      ),
-    );
-  return n;
-}
 

@@ -132,7 +132,7 @@ export default async function AgendaPage({
 
       {online ? (
         <Suspense fallback={<AgendaSkeleton />}>
-          <AgendaFlow slots={slots} holdHours={holdHours()} offer={voucher ? null : offer} voucher={voucher} payment={paymentInstructions()} />
+          <AgendaFlow slots={slots} holdHours={holdHours()} offer={voucher ? null : offer} voucher={voucher} brebAvailable={paymentInstructions() !== null} />
         </Suspense>
       ) : (
         <div className="mt-8" data-testid="agenda-fallback">
