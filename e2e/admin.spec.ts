@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { ADMIN_PASSWORD, ADMIN_USER, resetAgenda } from "./helpers";
 import { createBooking } from "../lib/agenda/bookings";
 import { loadAvailability } from "../lib/agenda/availability";
+import { addDays, todayInBogota, weekdayOf } from "../lib/agenda/time";
 
 test.beforeEach(async () => {
   await resetAgenda();
@@ -57,5 +58,38 @@ test("closing a day removes its slot from the public agenda", async ({ browser }
 
   const remaining = await loadAvailability();
   expect(remaining.some((s) => s.date === slot.date)).toBe(false);
+  await context.close();
+});
+
+test("admin creates a booking by hand, confirmed, and the public agenda loses that time", async ({ browser }) => {
+  const context = await browser.newContext({
+    httpCredentials: { username: ADMIN_USER, password: ADMIN_PASSWORD },
+  });
+  const page = await context.newPage();
+  await page.goto("/admin");
+  const form = page.getByTestId("manual-booking-form");
+  // A date the rules offer: the first Monday (Bogotá calendar) at least a week ahead.
+  let date = addDays(todayInBogota(), 7);
+  while (weekdayOf(date) !== 1) date = addDays(date, 1);
+  await form.getByLabel("Nombre").fill("Reserva Manual");
+  await form.getByLabel("Contacto").fill("+57 300 555 0000");
+  await form.getByLabel("Fecha").fill(date);
+  await form.getByLabel("Pago verificado: crear confirmada").check();
+  await form.getByRole("button", { name: "Crear reserva" }).click();
+  await expect(page).toHaveURL(/\/admin\/bookings\//);
+  await expect(page.getByTestId("booking-stage")).toHaveText("Confirmada");
+  await expect(page.getByText("+573005550000")).toBeVisible();
+
+  // The same time by hand again is refused.
+  await page.goto("/admin");
+  await form.getByLabel("Nombre").fill("Segunda");
+  await form.getByLabel("Contacto").fill("+57 300 555 0001");
+  await form.getByLabel("Fecha").fill(date);
+  await form.getByRole("button", { name: "Crear reserva" }).click();
+  await expect(page.getByTestId("admin-notice")).toContainText("Otra reserva activa ocupa ese horario");
+
+  // The public agenda no longer offers that day.
+  const offered = await loadAvailability();
+  expect(offered.some((s) => s.date === date)).toBe(false);
   await context.close();
 });

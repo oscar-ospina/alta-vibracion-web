@@ -29,6 +29,7 @@ import {
   shiftMonth,
 } from "@/lib/agenda/calendar";
 import { MonthCalendar } from "@/components/agenda/month-calendar";
+import { PaymentBox } from "@/components/agenda/payment-box";
 import { TimeZoneSelect, detectTimeZone } from "@/components/agenda/timezone-select";
 import { type BookingFormState, submitBooking } from "@/app/agenda/actions";
 
@@ -84,14 +85,22 @@ export type CampaignOffer = {
   closesAt: string | null;
 };
 
+/** A paid gift voucher the beneficiary arrived with; the server redeems it once. */
+export type GiftVoucher = { code: string; buyerName: string };
+
 export function AgendaFlow({
   slots,
   holdHours,
   offer = null,
+  voucher = null,
+  brebAvailable = false,
 }: {
   slots: Slot[];
   holdHours: number;
   offer?: CampaignOffer | null;
+  voucher?: GiftVoucher | null;
+  /** Whether a Bre-B key is configured. The key itself arrives with the created booking, never before. */
+  brebAvailable?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -155,13 +164,21 @@ export function AgendaFlow({
       <Card className="mt-8 max-w-2xl" data-testid="booking-created">
         <CardContent className="space-y-4">
           <h2 className="text-xl font-bold text-foreground">
-            Tu horario quedó reservado. Falta el pago.
+            {state.gift ? "Tu cita quedó confirmada." : "Tu horario quedó reservado. Falta el pago."}
           </h2>
-          <p className="text-muted-foreground">
-            Guardamos tu horario por {holdHours} horas mientras Liliana verifica el pago.
-            Escríbele por WhatsApp con tu código para recibir los datos de pago.
-            La cita queda confirmada cuando ella verifique la transferencia.
-          </p>
+          {state.gift ? (
+            <p className="text-muted-foreground" data-testid="gift-confirmed">
+              Es un regalo ya pagado: no tienes nada que pagar. Recibirás el enlace de Google Meet y
+              el formulario previo por el canal que elegiste. El resumen de la sesión será solo tuyo.
+            </p>
+          ) : (
+            <>
+              <p className="text-muted-foreground">
+                Guardamos tu horario por {holdHours} horas mientras Liliana verifica el pago.
+              </p>
+              <PaymentBox instructions={state.payment} amountCop={state.priceCop} code={state.code} />
+            </>
+          )}
           <dl className="space-y-1 rounded-xl bg-orange-50 p-4 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="font-semibold text-foreground">Código</dt>
@@ -185,9 +202,15 @@ export function AgendaFlow({
                 </dd>
               </div>
             )}
+            {state.gift && (
+              <div className="flex justify-between gap-4">
+                <dt className="font-semibold text-foreground">Valor</dt>
+                <dd className="text-right">Regalo</dd>
+              </div>
+            )}
             <div className="flex justify-between gap-4">
               <dt className="font-semibold text-foreground">Estado</dt>
-              <dd>Pendiente de pago</dd>
+              <dd data-testid="created-status">{state.gift ? "Confirmada" : "Pendiente de pago"}</dd>
             </div>
           </dl>
           <div className="flex flex-wrap gap-3">
@@ -224,6 +247,7 @@ export function AgendaFlow({
       <input type="hidden" name="startsAt" value={selectedSlot?.startsAt ?? ""} />
       <input type="hidden" name="origin" value={origin || (offer ? offer.code : "")} />
       {offer && <input type="hidden" name="campaignCode" value={offer.code} />}
+      {voucher && <input type="hidden" name="giftCode" value={voucher.code} />}
 
       <div className="grid items-start gap-5 lg:grid-cols-[300px_minmax(0,1fr)_240px]">
         <Card>
@@ -276,7 +300,7 @@ export function AgendaFlow({
             <h2 className="mb-4 text-sm font-bold text-foreground">Selecciona la fecha</h2>
             {dates.length === 0 ? (
               <p className="text-sm text-muted-foreground" data-testid="no-slots">
-                No hay horarios abiertos en las próximas cuatro semanas. Escríbenos por
+                No hay horarios abiertos en los próximos 30 días. Escríbenos por
                 WhatsApp y buscamos una opción.
               </p>
             ) : (
@@ -346,16 +370,21 @@ export function AgendaFlow({
               Precio
             </p>
             <p className="font-display text-2xl font-semibold text-foreground" data-testid="agenda-price">
-              {formatCOP(offer ? offer.priceCop : consultation.price)}
+              {voucher ? "Regalo" : formatCOP(offer ? offer.priceCop : consultation.price)}
             </p>
-            {offer ? (
+            {voucher ? (
+              <p className="text-xs text-muted-foreground" data-testid="agenda-voucher">
+                Bono de regalo de {voucher.buyerName}, ya pagado. Deja tus propios datos: la cita y el
+                resumen son tuyos.
+              </p>
+            ) : offer ? (
               <p className="text-xs text-muted-foreground" data-testid="agenda-offer">
                 Tarifa del encuentro «{offer.name}», válida para el contacto con el que te
                 registraste{offer.closesAt ? ` hasta el ${formatInZone(new Date(offer.closesAt), BOGOTA)} (Colombia)` : ""}.
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Pago por transferencia. Lili te envía los datos.
+                {brebAvailable ? "Pago por Bre-B; verás la llave al reservar." : "Pago por transferencia. Lili te envía los datos por WhatsApp."}
               </p>
             )}
           </div>

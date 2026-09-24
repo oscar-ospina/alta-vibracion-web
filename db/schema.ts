@@ -101,6 +101,53 @@ export const bookingStatus = pgEnum("booking_status", [
 
 export const contactChannel = pgEnum("contact_channel", ["whatsapp", "email"]);
 
+export const giftStatus = pgEnum("gift_status", [
+  "pending_payment",
+  "paid",
+  "redeemed",
+  "cancelled",
+  "refunded",
+]);
+
+/**
+ * A first session bought for another adult (plan section 7.1). The sale is
+ * recorded here, once; the beneficiary's booking later points back through
+ * `bookings.gift_order_id` and is not a second sale. The voucher `code` is
+ * unguessable and single-use: the partial unique index on
+ * `bookings.gift_order_id` lets one active booking exist per order.
+ * Buyer and beneficiary stay separate: this row never holds the
+ * beneficiary's data, and the buyer never sees the beneficiary's report.
+ */
+export const giftOrders = pgTable(
+  "gift_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Public voucher code the buyer shares: /regalar/<code>. */
+    code: text("code").notNull(),
+    serviceId: text("service_id").notNull(),
+    /** Price agreed with the buyer, in COP. Frozen at creation. */
+    priceCop: integer("price_cop").notNull(),
+    buyerName: text("buyer_name").notNull(),
+    buyerContactChannel: contactChannel("buyer_contact_channel").notNull(),
+    buyerContactValue: text("buyer_contact_value").notNull(),
+    /** Optional dedication the beneficiary reads on the invitation. */
+    message: text("message"),
+    status: giftStatus("status").notNull().default("pending_payment"),
+    /** Campaign whose price applied, when Liliana allowed gifts on it. */
+    campaignId: uuid("campaign_id").references(() => campaigns.id),
+    /** The inquiry this order came from, when it started on /regalar. */
+    interestId: uuid("interest_id").references(() => interests.id),
+    /** Conditions (validity, changes, refunds) as agreed with the buyer. */
+    conditions: text("conditions").notNull().default(""),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("gift_orders_code_idx").on(t.code), index("gift_orders_status_idx").on(t.status)],
+);
+
+
 export const bookings = pgTable(
   "bookings",
   {
@@ -124,6 +171,8 @@ export const bookings = pgTable(
     origin: text("origin"),
     /** The campaign whose price this booking took, when any. */
     campaignId: uuid("campaign_id").references(() => campaigns.id),
+    /** Set when this booking redeems a paid gift: not a sale, price_cop is 0. */
+    giftOrderId: uuid("gift_order_id").references(() => giftOrders.id),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -151,6 +200,10 @@ export const bookings = pgTable(
     // tstzrange(starts_at, ends_at) so overlapping slots can't coexist either.
     uniqueIndex("bookings_active_slot_idx")
       .on(t.startsAt)
+      .where(sql`${t.status} in ('pending_payment', 'confirmed')`),
+    // A voucher is redeemed once: one live booking per gift order.
+    uniqueIndex("bookings_gift_order_idx")
+      .on(t.giftOrderId)
       .where(sql`${t.status} in ('pending_payment', 'confirmed')`),
   ],
 );
@@ -233,6 +286,8 @@ export type Booking = typeof bookings.$inferSelect;
 export type BookingStatus = Booking["status"];
 export type Report = typeof reports.$inferSelect;
 export type ReportStatus = Report["status"];
+export type GiftOrder = typeof giftOrders.$inferSelect;
+export type GiftStatus = GiftOrder["status"];
 export type Campaign = typeof campaigns.$inferSelect;
 export type CampaignStatus = Campaign["status"];
 export type Interest = typeof interests.$inferSelect;

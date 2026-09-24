@@ -34,7 +34,7 @@ The project lives in the Vercel team `saas-alta`, which belongs to the GitHub-li
 ### Steps
 
 1. In Vercel, add the Neon integration from the Marketplace to this project. It creates the database and sets `DATABASE_URL` on the project. Use the pooled connection string (host ends in `-pooler`); Neon's integration sets that by default. Check the value in Project → Settings → Environment Variables. TLS comes from the `sslmode` parameter in that string; the app passes no separate SSL option.
-2. Add `ADMIN_USER`, `ADMIN_PASSWORD` and optionally `BOOKING_HOLD_HOURS` in the same place.
+2. Add `ADMIN_USER`, `ADMIN_PASSWORD`, `PAYMENT_BREB_KEY` (the Bre-B key clients pay to; optional `PAYMENT_BREB_HOLDER` with the name Bre-B shows) and optionally `BOOKING_HOLD_HOURS` in the same place. Without `PAYMENT_BREB_KEY` the pages say Lili sends the payment details by WhatsApp.
 3. From a machine with that `DATABASE_URL` exported:
 
 ```bash

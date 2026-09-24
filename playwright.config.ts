@@ -24,7 +24,7 @@ export default defineConfig({
   projects: [
     {
       name: "agenda",
-      testMatch: /agenda\.spec\.ts|admin\.spec\.ts|catalog\.spec\.ts|delivery\.spec\.ts|interests\.spec\.ts|campaigns\.spec\.ts/,
+      testMatch: /agenda\.spec\.ts|admin\.spec\.ts|catalog\.spec\.ts|delivery\.spec\.ts|interests\.spec\.ts|campaigns\.spec\.ts|gifts\.spec\.ts/,
       use: { baseURL: `http://localhost:${DB_PORT}` },
     },
     {
@@ -43,6 +43,8 @@ export default defineConfig({
         ...env,
         ADMIN_USER: env.ADMIN_USER || "lili",
         ADMIN_PASSWORD: env.ADMIN_PASSWORD || "test-password",
+        PAYMENT_BREB_KEY: env.PAYMENT_BREB_KEY || "@LILIANA729",
+        PAYMENT_BREB_HOLDER: env.PAYMENT_BREB_HOLDER || "Liliana T.",
       },
     },
     {
@@ -50,7 +52,7 @@ export default defineConfig({
       url: `http://localhost:${NO_DB_PORT}/`,
       reuseExistingServer: false,
       timeout: 60_000,
-      env: { ...env, DATABASE_URL: "" },
+      env: { ...env, DATABASE_URL: "", PAYMENT_BREB_KEY: "" },
     },
   ],
 });

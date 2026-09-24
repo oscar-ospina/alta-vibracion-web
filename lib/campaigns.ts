@@ -16,6 +16,7 @@ import { getDb, schema } from "@/db/client";
 import { UNIQUE_VIOLATION, pgError } from "@/db/errors";
 import type { Campaign } from "@/db/schema";
 import { findService } from "@/lib/catalog";
+import { holdHours } from "./agenda/bookings";
 import { addMinutes } from "./agenda/time";
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -120,8 +121,16 @@ export async function countRegistered(campaignId: string): Promise<number> {
   return n;
 }
 
-/** Promo cupos taken: confirmed orders plus pending ones whose hold is alive. */
+/**
+ * Promo cupos taken: confirmed orders plus pending ones whose hold is alive,
+ * plus the campaign's gift orders (plan section 5: a gift at the campaign
+ * price consumes the same capacity).
+ */
 export async function countPromoUsed(campaignId: string, now: Date = new Date()): Promise<number> {
+  const [{ gifts }] = await getDb()
+    .select({ gifts: count() })
+    .from(schema.giftOrders)
+    .where(and(eq(schema.giftOrders.campaignId, campaignId), giftHoldsCupo(now)));
   const [{ n }] = await getDb()
     .select({ n: count() })
     .from(schema.bookings)
@@ -134,7 +143,19 @@ export async function countPromoUsed(campaignId: string, now: Date = new Date())
         ),
       ),
     );
-  return n;
+  return n + gifts;
+}
+
+/**
+ * A gift order holds a cupo while paid or redeemed, and while pending for the
+ * same hours a booking's hold lasts; an order nobody paid frees it after that.
+ */
+function giftHoldsCupo(now: Date) {
+  const holdStart = addMinutes(now, -holdHours() * 60);
+  return or(
+    inArray(schema.giftOrders.status, ["paid", "redeemed"]),
+    and(eq(schema.giftOrders.status, "pending_payment"), gt(schema.giftOrders.createdAt, holdStart)),
+  );
 }
 
 /**
@@ -270,9 +291,14 @@ export async function lockAndViewCampaign(
     createdAt: new Date(raw.created_at as string),
     updatedAt: new Date(raw.updated_at as string),
   };
+  const holdStart = addMinutes(now, -holdHours() * 60);
   const used = await tx.execute(
-    sql`select count(*)::int as n from bookings where campaign_id = ${campaignId} and status in ('pending_payment', 'confirmed')`,
+    sql`select
+      (select count(*) from bookings where campaign_id = ${campaignId} and status in ('pending_payment', 'confirmed'))
+      + (select count(*) from gift_orders where campaign_id = ${campaignId}
+           and (status in ('paid', 'redeemed') or (status = 'pending_payment' and created_at > ${holdStart})))
+      as n`,
   );
-  const promoUsed = Number((used.rows[0] as { n: number }).n);
+  const promoUsed = Number((used.rows[0] as { n: number | string }).n);
   return { campaign, view: viewOf(campaign, promoUsed, now) };
 }

@@ -9,10 +9,11 @@ import { and, count, eq, gt, gte, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { EXCLUSION_VIOLATION, UNIQUE_VIOLATION, pgError } from "@/db/errors";
 import type { Booking } from "@/db/schema";
-import { findService } from "@/lib/catalog";
+import { FIRST_SESSION, findService } from "@/lib/catalog";
 import { countPromoUsed, findCampaignByCode, isRegistered, lockAndViewCampaign, viewOf } from "@/lib/campaigns";
-import { loadAvailability } from "./availability";
-import { addMinutes } from "./time";
+import { findGiftByCode, lockGiftRow } from "@/lib/gifts";
+import { loadAvailability, ruleDurationMinutes } from "./availability";
+import { BOGOTA, addMinutes, bogotaInstant } from "./time";
 
 /** Unambiguous alphabet (no 0/O, 1/I). */
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -38,6 +39,8 @@ export type CreateBookingInput = {
   origin: string | null;
   /** Campaign code from /encuentros/<code>; the price is applied only when eligible. */
   campaignCode?: string | null;
+  /** Voucher code from /regalar/<code>: a paid gift, redeemed once, no payment. */
+  giftCode?: string | null;
 };
 
 export type CreateBookingError =
@@ -47,7 +50,9 @@ export type CreateBookingError =
   | "too_many"
   | "campaign_unavailable"
   | "campaign_not_eligible"
-  | "campaign_sold_out";
+  | "campaign_sold_out"
+  | "gift_unavailable"
+  | "gift_used";
 
 export type CreateBookingResult =
   | { ok: true; booking: Booking }
@@ -57,6 +62,28 @@ export type CreateBookingResult =
 class SoldOut extends Error {}
 /** Thrown inside the booking transaction when the campaign closed or expired a moment earlier. */
 class CampaignGone extends Error {}
+/** Thrown inside the booking transaction when the voucher was redeemed a moment earlier. */
+class GiftUsed extends Error {}
+/** Thrown inside the booking transaction when the voucher was cancelled or refunded a moment earlier. */
+class GiftGone extends Error {}
+
+type Tx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
+
+/**
+ * Inside the booking transaction: lock the order, check it is still paid and
+ * mark it redeemed. The partial unique index on bookings.gift_order_id is the
+ * final guard against two bookings for one voucher.
+ */
+async function redeemGiftInTx(tx: Tx, giftOrderId: string, now: Date) {
+  await tx.execute(lockGiftRow(giftOrderId));
+  const [order] = await tx.select().from(schema.giftOrders).where(eq(schema.giftOrders.id, giftOrderId)).limit(1);
+  if (order?.status === "redeemed") throw new GiftUsed();
+  if (order?.status !== "paid") throw new GiftGone();
+  await tx
+    .update(schema.giftOrders)
+    .set({ status: "redeemed", redeemedAt: now, updatedAt: now })
+    .where(eq(schema.giftOrders.id, giftOrderId));
+}
 
 /** Live holds one contact may have at once. Keeps a script from squatting the calendar. */
 export const MAX_PENDING_PER_CONTACT = 2;
@@ -109,17 +136,30 @@ export async function createBooking(
     if (!(await isRegistered(campaign.id, input.contactValue))) return { ok: false, error: "campaign_not_eligible" };
   }
 
-  const [{ pending }] = await db
-    .select({ pending: count() })
-    .from(schema.bookings)
-    .where(
-      and(
-        eq(schema.bookings.contactValue, input.contactValue),
-        eq(schema.bookings.status, "pending_payment"),
-        gt(schema.bookings.holdExpiresAt, now),
-      ),
-    );
-  if (pending >= MAX_PENDING_PER_CONTACT) return { ok: false, error: "too_many" };
+  // A paid voucher: the booking is confirmed on creation, price 0, no hold,
+  // and the sale stays on the gift order (plan section 7.1).
+  let gift: Awaited<ReturnType<typeof findGiftByCode>> = null;
+  if (input.giftCode) {
+    if (campaign) return { ok: false, error: "gift_unavailable" };
+    gift = await findGiftByCode(input.giftCode);
+    if (!gift || gift.serviceId !== service.id) return { ok: false, error: "gift_unavailable" };
+    if (gift.status === "redeemed") return { ok: false, error: "gift_used" };
+    if (gift.status !== "paid") return { ok: false, error: "gift_unavailable" };
+  }
+
+  if (!gift) {
+    const [{ pending }] = await db
+      .select({ pending: count() })
+      .from(schema.bookings)
+      .where(
+        and(
+          eq(schema.bookings.contactValue, input.contactValue),
+          eq(schema.bookings.status, "pending_payment"),
+          gt(schema.bookings.holdExpiresAt, now),
+        ),
+      );
+    if (pending >= MAX_PENDING_PER_CONTACT) return { ok: false, error: "too_many" };
+  }
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const code = generateBookingCode();
@@ -137,13 +177,17 @@ export async function createBooking(
           if (locked.view !== "active") throw new CampaignGone();
           priceCop = locked.campaign.priceCop;
         }
+        if (gift) await redeemGiftInTx(tx, gift.id, now);
         const [row] = await tx
           .insert(schema.bookings)
           .values({
             code,
             serviceId: service.id,
-            priceCop,
+            priceCop: gift ? 0 : priceCop,
             campaignId: campaign?.id ?? null,
+            giftOrderId: gift?.id ?? null,
+            status: gift ? "confirmed" : "pending_payment",
+            confirmedAt: gift ? now : null,
             startsAt,
             endsAt,
             holdExpiresAt,
@@ -162,10 +206,104 @@ export async function createBooking(
     } catch (err) {
       if (err instanceof SoldOut) return { ok: false, error: "campaign_sold_out" };
       if (err instanceof CampaignGone) return { ok: false, error: "campaign_unavailable" };
+      if (err instanceof GiftUsed) return { ok: false, error: "gift_used" };
+      if (err instanceof GiftGone) return { ok: false, error: "gift_unavailable" };
       const pgErr = pgError(err);
       // Unique (same start) or exclusion (overlapping range): the slot is taken.
       if (pgErr?.code !== UNIQUE_VIOLATION && pgErr?.code !== EXCLUSION_VIOLATION) throw err;
       if (pgErr.constraint === "bookings_code_idx") continue; // retry with a new code
+      if (pgErr.constraint === "bookings_gift_order_idx") return { ok: false, error: "gift_used" };
+      return { ok: false, error: "slot_taken" };
+    }
+  }
+  throw new Error("could not allocate a unique booking code");
+}
+
+export type ManualBookingInput = {
+  customerName: string;
+  contactChannel: "whatsapp" | "email";
+  /** Already normalized (lib/contact.ts). */
+  contactValue: string;
+  /** Bogotá calendar date and time; any time, not only the offered slots. */
+  date: string;
+  time: string;
+  priceCop: number;
+  /** Liliana already verified the payment (late transfer, gift redemption). */
+  paid: boolean;
+  note?: string | null;
+  /** Redeem this paid voucher: the booking is confirmed, price 0, the order becomes redeemed. */
+  giftCode?: string | null;
+};
+
+export type ManualBookingResult =
+  | { ok: true; booking: Booking }
+  | { ok: false; error: "slot_taken" | "bad_values" | "past" | "gift_unavailable" | "gift_used" };
+
+/**
+ * A booking created by Liliana from the admin (plan section 7: a late payment
+ * after the hold lapsed, a gift being redeemed, a client who wrote by
+ * WhatsApp). It bypasses the public rules (lead day, offered slots, holds per
+ * contact) but never the double-booking guard: the same unique index and the
+ * overlap constraint decide, and a clash comes back as `slot_taken`.
+ */
+export async function createManualBooking(
+  input: ManualBookingInput,
+  now: Date = new Date(),
+): Promise<ManualBookingResult> {
+  if (input.customerName.trim().length < 2 || !Number.isInteger(input.priceCop) || input.priceCop < 0) {
+    return { ok: false, error: "bad_values" };
+  }
+  const startsAt = bogotaInstant(input.date, input.time);
+  if (Number.isNaN(startsAt.getTime())) return { ok: false, error: "bad_values" };
+  if (startsAt.getTime() <= now.getTime()) return { ok: false, error: "past" };
+  const db = getDb();
+  let gift: Awaited<ReturnType<typeof findGiftByCode>> = null;
+  if (input.giftCode) {
+    gift = await findGiftByCode(input.giftCode);
+    if (!gift) return { ok: false, error: "gift_unavailable" };
+    if (gift.status === "redeemed") return { ok: false, error: "gift_used" };
+    if (gift.status !== "paid") return { ok: false, error: "gift_unavailable" };
+  }
+  const endsAt = addMinutes(startsAt, await ruleDurationMinutes());
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const code = generateBookingCode();
+    try {
+      const booking = await db.transaction(async (tx) => {
+        await sweepExpiredHolds(tx, now);
+        if (gift) await redeemGiftInTx(tx, gift.id, now);
+        const paid = input.paid || Boolean(gift);
+        const [row] = await tx
+          .insert(schema.bookings)
+          .values({
+            code,
+            serviceId: FIRST_SESSION.id,
+            priceCop: gift ? 0 : input.priceCop,
+            giftOrderId: gift?.id ?? null,
+            startsAt,
+            endsAt,
+            status: paid ? "confirmed" : "pending_payment",
+            confirmedAt: paid ? now : null,
+            holdExpiresAt: addMinutes(now, holdHours() * 60),
+            customerName: input.customerName.trim(),
+            contactChannel: input.contactChannel,
+            contactValue: input.contactValue,
+            clientTimeZone: BOGOTA,
+            origin: input.note ? `manual:${input.note}` : "manual",
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning();
+        return row;
+      });
+      return { ok: true, booking };
+    } catch (err) {
+      if (err instanceof GiftUsed) return { ok: false, error: "gift_used" };
+      if (err instanceof GiftGone) return { ok: false, error: "gift_unavailable" };
+      const pgErr = pgError(err);
+      if (pgErr?.code !== UNIQUE_VIOLATION && pgErr?.code !== EXCLUSION_VIOLATION) throw err;
+      if (pgErr.constraint === "bookings_code_idx") continue;
+      if (pgErr.constraint === "bookings_gift_order_idx") return { ok: false, error: "gift_used" };
       return { ok: false, error: "slot_taken" };
     }
   }
@@ -229,20 +367,31 @@ export async function setBookingStatus(
   }
 
   try {
-    const [row] = await db
-      .update(schema.bookings)
-      .set({
-        status,
-        updatedAt: now,
-        confirmedAt: status === "confirmed" ? now : sql`${schema.bookings.confirmedAt}`,
-      })
-      .where(
-        and(
-          eq(schema.bookings.id, id),
-          eq(schema.bookings.status, current.status),
-        ),
-      )
-      .returning();
+    const row = await db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(schema.bookings)
+        .set({
+          status,
+          updatedAt: now,
+          confirmedAt: status === "confirmed" ? now : sql`${schema.bookings.confirmedAt}`,
+        })
+        .where(
+          and(
+            eq(schema.bookings.id, id),
+            eq(schema.bookings.status, current.status),
+          ),
+        )
+        .returning();
+      // Cancelling a gift's booking gives the voucher back: the sale stands,
+      // the beneficiary picks another time (plan section 7.1, changes).
+      if (updated && status === "cancelled" && updated.giftOrderId) {
+        await tx
+          .update(schema.giftOrders)
+          .set({ status: "paid", redeemedAt: null, updatedAt: now })
+          .where(and(eq(schema.giftOrders.id, updated.giftOrderId), eq(schema.giftOrders.status, "redeemed")));
+      }
+      return updated;
+    });
     if (!row) return { ok: false, error: "not_pending" };
     return { ok: true, booking: row };
   } catch (err) {

@@ -10,6 +10,8 @@ import { STAGE_LABEL, STATUS_LABEL } from "@/lib/agenda/labels";
 import { bookingServiceLabel, formatCOP } from "@/lib/catalog";
 import { whatsappUrl } from "@/lib/site";
 import { Prose } from "@/components/sections/prose";
+import { PaymentBox } from "@/components/agenda/payment-box";
+import { paymentInstructions } from "@/lib/payment";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +67,7 @@ export default async function BookingStatusPage({
             )}
             <div className="flex justify-between gap-4">
               <dt className="font-semibold text-foreground">Valor</dt>
-              <dd>{formatCOP(booking.priceCop)}</dd>
+              <dd>{booking.giftOrderId ? "Regalo ya pagado" : formatCOP(booking.priceCop)}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="font-semibold text-foreground">Estado</dt>
@@ -75,6 +77,9 @@ export default async function BookingStatusPage({
             </div>
           </dl>
           <p className="text-muted-foreground">{info.hint}</p>
+          {stage === "pending_payment" && (
+            <PaymentBox instructions={paymentInstructions()} amountCop={booking.priceCop} code={booking.code} />
+          )}
           <Button asChild>
             <a
               href={whatsappUrl(`Hola, te escribo por mi reserva ${booking.code}.`)}

@@ -5,10 +5,13 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdmin } from "@/lib/admin-auth-server";
-import { setBookingStatus } from "@/lib/agenda/bookings";
+import { ruleDurationMinutes } from "@/lib/agenda/availability";
+import { createManualBooking, setBookingStatus } from "@/lib/agenda/bookings";
+import { isContactChannel, isValidContact, normalizeContact } from "@/lib/contact";
 import { markAttended, markFollowUpDone, markIntakeReceived, saveReport } from "@/lib/agenda/delivery";
 import { setInterestStatus } from "@/lib/interests";
 import { activateCampaign, closeCampaign, createCampaign } from "@/lib/campaigns";
+import { createGiftFromInterest, createGiftOrder, setGiftStatus, updateGiftMessage } from "@/lib/gifts";
 import { HHMM_RE, ISO_DATE_RE, addDays, bogotaInstant, weekdayOf } from "@/lib/agenda/time";
 import type { AdminNoticeKey } from "@/lib/agenda/labels";
 
@@ -58,7 +61,7 @@ export async function addOverride(formData: FormData) {
     // Same length as the regular slots, so an extra morning protects the same time.
     const db = getDb();
     const rules = await db.select().from(schema.availabilityRules);
-    durationMinutes = rules[0]?.durationMinutes ?? 135;
+    durationMinutes = await ruleDurationMinutes();
     const start = bogotaInstant(date, time).getTime();
     const end = start + durationMinutes * 60_000;
     const sameDay = [
@@ -195,4 +198,108 @@ export async function closeCampaignAction(formData: FormData) {
   const row = UUID_RE.test(id) ? await closeCampaign(id) : null;
   revalidatePath("/agenda");
   notifyCampaigns(row ? "saved" : "campaign_not_found");
+}
+
+// Manual booking (lib/agenda/bookings.ts createManualBooking): late payments,
+// gift redemptions and clients who wrote by WhatsApp.
+
+export async function createManualBookingAction(formData: FormData) {
+  await requireAdmin();
+  const customerName = String(formData.get("customerName") ?? "").trim().slice(0, 80);
+  const contactChannel = String(formData.get("contactChannel") ?? "");
+  const contactRaw = String(formData.get("contactValue") ?? "").trim().slice(0, 120);
+  const date = String(formData.get("date") ?? "");
+  const time = String(formData.get("time") ?? "").trim();
+  const priceRaw = String(formData.get("priceCop") ?? "").trim();
+  if (!/^\d{1,9}$/.test(priceRaw)) notify("manual_bad_values");
+  const priceCop = Number(priceRaw);
+  const paid = formData.get("paid") === "on";
+  const note = String(formData.get("note") ?? "").trim().slice(0, 40) || null;
+  const giftCode = String(formData.get("giftCode") ?? "").trim().toUpperCase().slice(0, 12) || null;
+  if (!isContactChannel(contactChannel) || !isValidContact(contactChannel, contactRaw)) notify("manual_bad_contact");
+  if (!ISO_DATE_RE.test(date) || addDays(date, 0) !== date) notify("bad_date");
+  if (!HHMM_RE.test(time)) notify("bad_time");
+  if (note && !/^[a-z0-9-]+$/i.test(note)) notify("manual_bad_values");
+  const res = await createManualBooking({
+    customerName,
+    contactChannel,
+    contactValue: normalizeContact(contactChannel, contactRaw),
+    date,
+    time,
+    priceCop,
+    paid,
+    note,
+    giftCode,
+  });
+  revalidatePath("/admin");
+  revalidatePath("/agenda");
+  if (!res.ok) {
+    const key = {
+      slot_taken: "slot_taken",
+      past: "manual_past",
+      bad_values: "manual_bad_values",
+      gift_unavailable: "gift_unavailable",
+      gift_used: "gift_used",
+    } as const;
+    notify(key[res.error]);
+  }
+  redirect(`/admin/bookings/${res.booking.id}?aviso=saved`);
+}
+
+// Gift orders (lib/gifts.ts): /admin/gifts.
+
+function notifyGifts(key: AdminNoticeKey): never {
+  revalidatePath("/admin/gifts");
+  redirect(`/admin/gifts?aviso=${key}`);
+}
+
+export async function createGiftOrderAction(formData: FormData) {
+  await requireAdmin();
+  const channel = String(formData.get("buyerContactChannel") ?? "");
+  const contactRaw = String(formData.get("buyerContactValue") ?? "").trim().slice(0, 120);
+  if (!isContactChannel(channel) || !isValidContact(channel, contactRaw)) notifyGifts("manual_bad_contact");
+  const campaignId = String(formData.get("campaignId") ?? "").trim();
+  if (campaignId && !UUID_RE.test(campaignId)) notifyGifts("gift_campaign_unavailable");
+  const priceRaw = String(formData.get("priceCop") ?? "").trim();
+  if (!/^\d{1,9}$/.test(priceRaw)) notifyGifts("gift_bad_values");
+  const res = await createGiftOrder({
+    buyerName: String(formData.get("buyerName") ?? "").slice(0, 80),
+    buyerContactChannel: channel,
+    buyerContactValue: normalizeContact(channel, contactRaw),
+    message: String(formData.get("message") ?? "").slice(0, 500),
+    priceCop: Number(priceRaw),
+    campaignId: campaignId || null,
+    conditions: String(formData.get("conditions") ?? "").slice(0, 2000),
+    paid: formData.get("paid") === "on",
+  });
+  if (!res.ok) notifyGifts(res.error === "bad_values" ? "gift_bad_values" : "gift_campaign_unavailable");
+  revalidatePath("/admin");
+  notifyGifts("saved");
+}
+
+export async function createGiftFromInterestAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("interestId") ?? "");
+  const res = UUID_RE.test(id) ? await createGiftFromInterest(id) : ({ ok: false, error: "not_found" } as const);
+  revalidatePath("/admin/interests");
+  if (!res.ok) notifyGifts(res.error === "not_found" ? "interest_not_found" : res.error === "bad_values" ? "gift_bad_values" : "gift_campaign_unavailable");
+  notifyGifts("saved");
+}
+
+export async function setGiftStatusAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const status = String(formData.get("status") ?? "");
+  if (status !== "paid" && status !== "cancelled" && status !== "refunded") notifyGifts("gift_bad_transition");
+  const res = UUID_RE.test(id) ? await setGiftStatus(id, status) : ({ ok: false, error: "not_found" } as const);
+  revalidatePath("/admin");
+  notifyGifts(res.ok ? "saved" : res.error === "not_found" ? "gift_not_found" : "gift_bad_transition");
+}
+
+export async function updateGiftMessageAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const message = String(formData.get("message") ?? "").slice(0, 500);
+  const res = UUID_RE.test(id) ? await updateGiftMessage(id, message) : ({ ok: false, error: "not_found" } as const);
+  notifyGifts(res.ok ? "saved" : "gift_not_found");
 }

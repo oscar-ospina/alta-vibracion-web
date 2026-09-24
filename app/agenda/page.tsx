@@ -7,8 +7,10 @@ import { loadAvailability } from "@/lib/agenda/availability";
 import { holdHours } from "@/lib/agenda/bookings";
 import { CAMPAIGN_CODE_RE, quote } from "@/lib/campaigns";
 import { ACTIVE_SERVICES, FIRST_SESSION, formatCOP } from "@/lib/catalog";
+import { GIFT_CODE_RE, redeemableGift } from "@/lib/gifts";
+import { paymentInstructions } from "@/lib/payment";
 import { whatsappUrl } from "@/lib/site";
-import { AgendaFlow, AgendaSkeleton, type CampaignOffer } from "@/components/agenda/agenda-flow";
+import { AgendaFlow, AgendaSkeleton, type CampaignOffer, type GiftVoucher } from "@/components/agenda/agenda-flow";
 
 export const metadata: Metadata = {
   title: "Agenda tu sesión",
@@ -27,10 +29,11 @@ export const dynamic = "force-dynamic";
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ campana?: string | string[] }>;
+  searchParams: Promise<{ campana?: string | string[]; bono?: string | string[] }>;
 }) {
   const params = await searchParams;
   const campana = typeof params.campana === "string" ? params.campana : "";
+  const bono = typeof params.bono === "string" ? params.bono : "";
   // Liliana pauses the offer by setting the service to `paused`: the agenda
   // then shows the manual path instead of a calendar nobody can buy from.
   let online = hasDatabase() && ACTIVE_SERVICES.length > 0;
@@ -40,6 +43,9 @@ export default async function AgendaPage({
   // at the general price, visibly.
   let offer: CampaignOffer | null = null;
   let campaignNotice: string | null = null;
+  // A gift voucher (plan section 7.1): paid → the beneficiary books without
+  // paying; anything else is said out loud and the flow stays at the general price.
+  let voucher: GiftVoucher | null = null;
   if (online) {
     try {
       slots = await loadAvailability();
@@ -53,7 +59,30 @@ export default async function AgendaPage({
   // problem never takes the general agenda down. Active: the flow shows its
   // price and the server validates the contact. Anything else: say so, then
   // continue at the general price, visibly.
-  if (online && campana) {
+  // A gift voucher (plan section 7.1): paid, the beneficiary books without
+  // paying; anything else is said out loud and the flow stays at the general price.
+  if (online && bono) {
+    const giftCode = bono.toUpperCase();
+    try {
+      const g = GIFT_CODE_RE.test(giftCode) ? await redeemableGift(giftCode) : ({ state: "not_found" } as const);
+      if (g.state === "ready") {
+        voucher = { code: g.order.code, buyerName: g.order.buyerName };
+      } else if (g.state === "not_found") {
+        campaignNotice = "El enlace del regalo no es válido. Lo que reserves aquí va al precio general.";
+      } else if (g.state === "redeemed") {
+        campaignNotice = "Este bono de regalo ya fue canjeado. Lo que reserves aquí va al precio general.";
+      } else if (g.state === "pending") {
+        campaignNotice = "Este bono de regalo aún no está confirmado como pagado. Lo que reserves aquí va al precio general.";
+      } else {
+        campaignNotice = "Este bono de regalo fue cancelado. Lo que reserves aquí va al precio general.";
+      }
+    } catch (err) {
+      console.error("agenda: gift lookup failed", err);
+      campaignNotice = "No pudimos comprobar el bono de regalo. Lo que reserves aquí va al precio general; escríbenos si tenías un bono.";
+    }
+  }
+
+  if (online && campana && !voucher) {
     const code = campana.toUpperCase();
     try {
       const q = CAMPAIGN_CODE_RE.test(code) ? await quote(code, null) : ({ state: "not_found" } as const);
@@ -103,7 +132,7 @@ export default async function AgendaPage({
 
       {online ? (
         <Suspense fallback={<AgendaSkeleton />}>
-          <AgendaFlow slots={slots} holdHours={holdHours()} offer={offer} />
+          <AgendaFlow slots={slots} holdHours={holdHours()} offer={voucher ? null : offer} voucher={voucher} brebAvailable={paymentInstructions() !== null} />
         </Suspense>
       ) : (
         <div className="mt-8" data-testid="agenda-fallback">

@@ -73,7 +73,7 @@ export default async function AdminBookingPage({
       <Card className="mt-6">
         <CardContent>
           <dl className="space-y-1 text-sm">
-            <Row label="Sesión">{bookingServiceLabel(b)} · {formatCOP(b.priceCop)}</Row>
+            <Row label="Sesión">{bookingServiceLabel(b)} · {b.giftOrderId ? "regalo canjeado" : formatCOP(b.priceCop)}</Row>
             <Row label="Hora de Colombia">{formatInZone(b.startsAt, BOGOTA)}</Row>
             {b.clientTimeZone !== BOGOTA && (
               <Row label="Hora del cliente">{formatInZone(b.startsAt, b.clientTimeZone)} ({b.clientTimeZone})</Row>

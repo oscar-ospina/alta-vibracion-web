@@ -8,7 +8,7 @@ import { BOGOTA, formatInZone } from "@/lib/agenda/time";
 import { findService } from "@/lib/catalog";
 import { displayContact } from "@/lib/contact";
 import { listInterests } from "@/lib/interests";
-import { markInterest } from "../actions";
+import { createGiftFromInterestAction, markInterest } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +55,12 @@ function InterestList({ rows, testId }: { rows: Interest[]; testId: string }) {
             <span className="text-muted-foreground">{findService(r.serviceId)?.name ?? r.serviceId}</span>
             {r.origin && <span className="text-muted-foreground">origen: {r.origin}</span>}
             <span className="ml-auto flex gap-2">
+              {r.kind === "gift" && (
+                <form action={createGiftFromInterestAction}>
+                  <input type="hidden" name="interestId" value={r.id} />
+                  <Button size="sm" type="submit">Crear orden de regalo</Button>
+                </form>
+              )}
               <form action={markInterest}>
                 <input type="hidden" name="id" value={r.id} />
                 <input type="hidden" name="status" value="contacted" />
