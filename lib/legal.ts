@@ -17,7 +17,7 @@ export function readLegalDoc(slug: LegalSlug): string {
 }
 
 /** Private operating docs rendered under /admin (script, week plan). Same build-time read. */
-export type AdminDocSlug = "script" | "week-plan";
+export type AdminDocSlug = "script" | "week-plan" | "operacion";
 
 export function readAdminDoc(slug: AdminDocSlug): string {
   return readFileSync(join(process.cwd(), "content", "admin", `${slug}.md`), "utf8");

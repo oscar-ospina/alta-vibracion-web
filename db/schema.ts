@@ -53,6 +53,17 @@ export const availabilityOverrides = pgTable(
   (t) => [index("availability_overrides_date_idx").on(t.date)],
 );
 
+/**
+ * Operating switches Liliana flips from the admin without a deploy (plan
+ * section 12, row 6: "pausa reservas ... sin tocar código"). One row per
+ * key; a missing row means the default.
+ */
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const campaignStatus = pgEnum("campaign_status", ["draft", "interest", "active", "closed"]);
 
 /**
@@ -286,6 +297,7 @@ export type Booking = typeof bookings.$inferSelect;
 export type BookingStatus = Booking["status"];
 export type Report = typeof reports.$inferSelect;
 export type ReportStatus = Report["status"];
+export type Setting = typeof settings.$inferSelect;
 export type GiftOrder = typeof giftOrders.$inferSelect;
 export type GiftStatus = GiftOrder["status"];
 export type Campaign = typeof campaigns.$inferSelect;

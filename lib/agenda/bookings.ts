@@ -12,6 +12,7 @@ import type { Booking } from "@/db/schema";
 import { FIRST_SESSION, findService } from "@/lib/catalog";
 import { countPromoUsed, findCampaignByCode, isRegistered, lockAndViewCampaign, viewOf } from "@/lib/campaigns";
 import { findGiftByCode, lockGiftRow } from "@/lib/gifts";
+import { bookingsPaused } from "@/lib/settings";
 import { loadAvailability, ruleDurationMinutes } from "./availability";
 import { BOGOTA, addMinutes, bogotaInstant } from "./time";
 
@@ -52,7 +53,8 @@ export type CreateBookingError =
   | "campaign_not_eligible"
   | "campaign_sold_out"
   | "gift_unavailable"
-  | "gift_used";
+  | "gift_used"
+  | "paused";
 
 export type CreateBookingResult =
   | { ok: true; booking: Booking }
@@ -113,6 +115,8 @@ export async function createBooking(
   // services are rejected here, whatever the form said.
   const service = findService(input.serviceId);
   if (service?.status !== "active") return { ok: false, error: "invalid_service" };
+  // Liliana's pause switch (plan section 12, row 6) closes the public path; the admin still books by hand.
+  if (await bookingsPaused()) return { ok: false, error: "paused" };
 
   const offered = (await loadAvailability(now)).find((s) => s.startsAt === input.startsAt);
   if (!offered) return { ok: false, error: "unavailable" };

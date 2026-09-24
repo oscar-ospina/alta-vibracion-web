@@ -9,6 +9,7 @@ import { CAMPAIGN_CODE_RE, quote } from "@/lib/campaigns";
 import { ACTIVE_SERVICES, FIRST_SESSION, formatCOP } from "@/lib/catalog";
 import { GIFT_CODE_RE, redeemableGift } from "@/lib/gifts";
 import { paymentInstructions } from "@/lib/payment";
+import { bookingsPaused } from "@/lib/settings";
 import { whatsappUrl } from "@/lib/site";
 import { AgendaFlow, AgendaSkeleton, type CampaignOffer, type GiftVoucher } from "@/components/agenda/agenda-flow";
 
@@ -38,6 +39,16 @@ export default async function AgendaPage({
   // then shows the manual path instead of a calendar nobody can buy from.
   let online = hasDatabase() && ACTIVE_SERVICES.length > 0;
   let slots: Awaited<ReturnType<typeof loadAvailability>> = [];
+  // Liliana's pause switch: the manual path, no calendar, until she resumes.
+  let paused = false;
+  if (online) {
+    try {
+      paused = await bookingsPaused();
+    } catch (err) {
+      console.error("agenda: settings unavailable", err);
+    }
+    if (paused) online = false;
+  }
   // A campaign link (plan section 5). Active: the flow shows its price and
   // the server validates the contact. Anything else: say so, then continue
   // at the general price, visibly.
@@ -119,7 +130,7 @@ export default async function AgendaPage({
       <p className="mt-2 text-muted-foreground">
         {online
           ? "Elige tu sesión, la fecha y la hora. Tu cita queda confirmada cuando Liliana verifique el pago."
-          : ACTIVE_SERVICES.length === 0
+          : paused || ACTIVE_SERVICES.length === 0
             ? "Las reservas están en pausa por ahora. Escríbenos por WhatsApp si quieres una fecha."
             : "Escríbenos por WhatsApp y te compartimos los horarios disponibles."}
       </p>
@@ -135,7 +146,7 @@ export default async function AgendaPage({
           <AgendaFlow slots={slots} holdHours={holdHours()} offer={voucher ? null : offer} voucher={voucher} brebAvailable={paymentInstructions() !== null} />
         </Suspense>
       ) : (
-        <div className="mt-8" data-testid="agenda-fallback">
+        <div className="mt-8" data-testid="agenda-fallback" data-paused={paused ? "1" : undefined}>
           <Button asChild size="lg">
             <a
               href={whatsappUrl(

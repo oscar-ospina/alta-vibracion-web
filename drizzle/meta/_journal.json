@@ -43,6 +43,13 @@
       "when": 1790213125327,
       "tag": "0005_gifts",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790214894911,
+      "tag": "0006_settings",
+      "breakpoints": true
     }
   ]
 }
