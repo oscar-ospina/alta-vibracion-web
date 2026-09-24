@@ -5,10 +5,11 @@
  * real guard; a 23505 here means someone else won the slot a moment earlier.
  */
 import { randomBytes } from "node:crypto";
-import { and, count, eq, gt, gte, lte, sql } from "drizzle-orm";
+import { and, count, eq, gt, gte, inArray, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import type { Booking } from "@/db/schema";
 import { findService } from "@/lib/catalog";
+import { countPromoUsed, findCampaignByCode, isRegistered, lockCampaignRow, viewOf } from "@/lib/campaigns";
 import { loadAvailability } from "./availability";
 import { addMinutes } from "./time";
 
@@ -34,11 +35,25 @@ export type CreateBookingInput = {
   contactValue: string;
   clientTimeZone: string;
   origin: string | null;
+  /** Campaign code from /encuentros/<code>; the price is applied only when eligible. */
+  campaignCode?: string | null;
 };
+
+export type CreateBookingError =
+  | "slot_taken"
+  | "unavailable"
+  | "invalid_service"
+  | "too_many"
+  | "campaign_unavailable"
+  | "campaign_not_eligible"
+  | "campaign_sold_out";
 
 export type CreateBookingResult =
   | { ok: true; booking: Booking }
-  | { ok: false; error: "slot_taken" | "unavailable" | "invalid_service" | "too_many" };
+  | { ok: false; error: CreateBookingError };
+
+/** Thrown inside the booking transaction when the campaign's last cupo just went. */
+class SoldOut extends Error {}
 
 /** Live holds one contact may have at once. Keeps a script from squatting the calendar. */
 export const MAX_PENDING_PER_CONTACT = 2;
@@ -89,6 +104,19 @@ export async function createBooking(
   const holdExpiresAt = addMinutes(now, holdHours() * 60);
   const db = getDb();
 
+  // Campaign price: only for an active campaign, a registered contact and a
+  // free promo cupo. Anything else is an explicit error, never a silent
+  // fallback to the general price (plan section 5, last bullet).
+  let campaign: Awaited<ReturnType<typeof findCampaignByCode>> = null;
+  if (input.campaignCode) {
+    campaign = await findCampaignByCode(input.campaignCode);
+    if (!campaign || campaign.serviceId !== service.id) return { ok: false, error: "campaign_unavailable" };
+    const view = viewOf(campaign, await countPromoUsed(campaign.id, now), now);
+    if (view === "sold_out") return { ok: false, error: "campaign_sold_out" };
+    if (view !== "active") return { ok: false, error: "campaign_unavailable" };
+    if (!(await isRegistered(campaign.id, input.contactValue))) return { ok: false, error: "campaign_not_eligible" };
+  }
+
   const [{ pending }] = await db
     .select({ pending: count() })
     .from(schema.bookings)
@@ -106,12 +134,27 @@ export async function createBooking(
     try {
       const booking = await db.transaction(async (tx) => {
         await sweepExpiredHolds(tx, now);
+        if (campaign) {
+          // Serialize buyers of the same campaign so the last cupo goes to one of them.
+          await tx.execute(lockCampaignRow(campaign.id));
+          const [{ used }] = await tx
+            .select({ used: count() })
+            .from(schema.bookings)
+            .where(
+              and(
+                eq(schema.bookings.campaignId, campaign.id),
+                inArray(schema.bookings.status, ["pending_payment", "confirmed"]),
+              ),
+            );
+          if (used >= campaign.capacity) throw new SoldOut();
+        }
         const [row] = await tx
           .insert(schema.bookings)
           .values({
             code,
             serviceId: service.id,
-            priceCop: service.price,
+            priceCop: campaign ? campaign.priceCop : service.price,
+            campaignId: campaign?.id ?? null,
             startsAt,
             endsAt,
             holdExpiresAt,
@@ -128,6 +171,7 @@ export async function createBooking(
       });
       return { ok: true, booking };
     } catch (err) {
+      if (err instanceof SoldOut) return { ok: false, error: "campaign_sold_out" };
       const pgErr = unwrapPgError(err);
       // 23505 = unique (same start), 23P01 = exclusion (overlapping range).
       if (pgErr?.code !== "23505" && pgErr?.code !== "23P01") throw err;

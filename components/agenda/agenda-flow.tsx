@@ -76,7 +76,23 @@ function buildHandoffMessage(args: {
   );
 }
 
-export function AgendaFlow({ slots, holdHours }: { slots: Slot[]; holdHours: number }) {
+/** An active campaign the visitor arrived with; the server re-validates it. */
+export type CampaignOffer = {
+  code: string;
+  name: string;
+  priceCop: number;
+  closesAt: string | null;
+};
+
+export function AgendaFlow({
+  slots,
+  holdHours,
+  offer = null,
+}: {
+  slots: Slot[];
+  holdHours: number;
+  offer?: CampaignOffer | null;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const consultationParam = searchParams.get("consultation");
@@ -206,7 +222,8 @@ export function AgendaFlow({ slots, holdHours }: { slots: Slot[]; holdHours: num
     <form action={formAction} className="mt-8">
       <input type="hidden" name="serviceId" value={consultation.id} />
       <input type="hidden" name="startsAt" value={selectedSlot?.startsAt ?? ""} />
-      <input type="hidden" name="origin" value={origin} />
+      <input type="hidden" name="origin" value={origin || (offer ? offer.code : "")} />
+      {offer && <input type="hidden" name="campaignCode" value={offer.code} />}
 
       <div className="grid items-start gap-5 lg:grid-cols-[300px_minmax(0,1fr)_240px]">
         <Card>
@@ -328,12 +345,19 @@ export function AgendaFlow({ slots, holdHours }: { slots: Slot[]; holdHours: num
             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Precio
             </p>
-            <p className="font-display text-2xl font-semibold text-foreground">
-              {formatCOP(consultation.price)}
+            <p className="font-display text-2xl font-semibold text-foreground" data-testid="agenda-price">
+              {formatCOP(offer ? offer.priceCop : consultation.price)}
             </p>
-            <p className="text-xs text-muted-foreground">
-              Pago por transferencia. Lili te envía los datos.
-            </p>
+            {offer ? (
+              <p className="text-xs text-muted-foreground" data-testid="agenda-offer">
+                Tarifa del encuentro «{offer.name}», válida para el contacto con el que te
+                registraste{offer.closesAt ? ` hasta el ${formatInZone(new Date(offer.closesAt), BOGOTA)} (Colombia)` : ""}.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Pago por transferencia. Lili te envía los datos.
+              </p>
+            )}
           </div>
 
           <div>

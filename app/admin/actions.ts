@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/admin-auth-server";
 import { setBookingStatus } from "@/lib/agenda/bookings";
 import { markAttended, markFollowUpDone, markIntakeReceived, saveReport } from "@/lib/agenda/delivery";
 import { setInterestStatus } from "@/lib/interests";
+import { activateCampaign, closeCampaign, createCampaign } from "@/lib/campaigns";
 import { HHMM_RE, ISO_DATE_RE, addDays, bogotaInstant, weekdayOf } from "@/lib/agenda/time";
 import type { AdminNoticeKey } from "@/lib/agenda/labels";
 
@@ -136,4 +137,58 @@ export async function markInterest(formData: FormData) {
   const res = UUID_RE.test(id) ? await setInterestStatus(id, status) : ({ ok: false, error: "not_found" } as const);
   revalidatePath("/admin/interests");
   redirect(`/admin/interests?aviso=${res.ok ? "saved" : "interest_not_found"}`);
+}
+
+// Campaigns (lib/campaigns.ts): /admin/campaigns.
+
+function notifyCampaigns(key: AdminNoticeKey): never {
+  revalidatePath("/admin/campaigns");
+  redirect(`/admin/campaigns?aviso=${key}`);
+}
+
+export async function createCampaignAction(formData: FormData) {
+  await requireAdmin();
+  const res = await createCampaign({
+    name: String(formData.get("name") ?? "").slice(0, 120),
+    priceCop: Number(formData.get("priceCop")),
+    threshold: Number(formData.get("threshold")),
+    capacity: Number(formData.get("capacity")),
+    allowsGift: formData.get("allowsGift") === "on",
+    conditions: String(formData.get("conditions") ?? "").slice(0, 4000),
+  });
+  notifyCampaigns(res.ok ? "saved" : "campaign_bad_values");
+}
+
+export async function activateCampaignAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!UUID_RE.test(id)) notifyCampaigns("campaign_not_found");
+  // datetime-local has no zone; Liliana types Colombia time.
+  const raw = String(formData.get("closesAt") ?? "").trim();
+  let closesAt: Date | null = null;
+  if (raw) {
+    const m = raw.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+    if (!m || !ISO_DATE_RE.test(m[1]) || !HHMM_RE.test(m[2])) notifyCampaigns("campaign_bad_window");
+    closesAt = bogotaInstant(m![1], m![2]);
+  }
+  const res = await activateCampaign(id, { closesAt, force: formData.get("force") === "on" });
+  if (!res.ok) {
+    const key = {
+      not_found: "campaign_not_found",
+      not_activable: "campaign_not_activable",
+      below_threshold: "campaign_below_threshold",
+      bad_window: "campaign_bad_window",
+    } as const;
+    notifyCampaigns(key[res.error]);
+  }
+  revalidatePath("/agenda");
+  notifyCampaigns("saved");
+}
+
+export async function closeCampaignAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const row = UUID_RE.test(id) ? await closeCampaign(id) : null;
+  revalidatePath("/agenda");
+  notifyCampaigns(row ? "saved" : "campaign_not_found");
 }

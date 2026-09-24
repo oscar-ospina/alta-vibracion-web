@@ -6,7 +6,7 @@
  * updates the open row (the partial unique index in db/schema.ts) so the
  * campaign threshold can never be reached by one person sending three forms.
  */
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import type { Interest, InterestKind, InterestStatus } from "@/db/schema";
 import { findService } from "@/lib/catalog";
@@ -24,6 +24,8 @@ export type SaveInterestInput = {
   message?: string | null;
   consent: boolean;
   origin?: string | null;
+  /** Kind `campaign` only: the event registered for. */
+  campaignId?: string | null;
 };
 
 export type SaveInterestResult =
@@ -43,39 +45,68 @@ export async function saveInterest(
   input: SaveInterestInput,
   now: Date = new Date(),
 ): Promise<SaveInterestResult> {
-  if (interestKindFor(input.serviceId) !== input.kind) return { ok: false, error: "invalid_service" };
+  if (input.kind === "campaign") {
+    // A campaign registration is an interest in the campaign's own service.
+    if (!input.campaignId || findService(input.serviceId)?.status !== "active") {
+      return { ok: false, error: "invalid_service" };
+    }
+  } else if (interestKindFor(input.serviceId) !== input.kind || input.campaignId) {
+    return { ok: false, error: "invalid_service" };
+  }
   if (!input.consent) return { ok: false, error: "no_consent" };
   const db = getDb();
-  const values = {
-    kind: input.kind,
-    serviceId: input.serviceId,
-    preferredName: input.preferredName,
-    contactChannel: input.contactChannel,
-    contactValue: input.contactValue,
+  const campaignId = input.campaignId ?? null;
+  const sameOpenRow = and(
+    eq(schema.interests.kind, input.kind),
+    eq(schema.interests.serviceId, input.serviceId),
+    eq(schema.interests.contactValue, input.contactValue),
+    campaignId ? eq(schema.interests.campaignId, campaignId) : isNull(schema.interests.campaignId),
+    eq(schema.interests.status, "new"),
+  );
+  // Refresh what the person may have changed; keep the first name and date.
+  const refresh = {
     organization: input.organization ?? null,
     topic: input.topic ?? null,
     message: input.message ?? null,
-    consent: true,
-    origin: input.origin ?? null,
-    createdAt: now,
     updatedAt: now,
   };
-  const [row] = await db
-    .insert(schema.interests)
-    .values(values)
-    .onConflictDoUpdate({
-      target: [schema.interests.kind, schema.interests.serviceId, schema.interests.contactValue],
-      targetWhere: sql`${schema.interests.status} = 'new'`,
-      // Keep the first name and date; refresh what the person may have changed.
-      set: {
-        organization: values.organization,
-        topic: values.topic,
-        message: values.message,
-        updatedAt: now,
-      },
-    })
-    .returning();
-  return { ok: true, interest: row, repeated: row.createdAt.getTime() !== now.getTime() };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const [existing] = await db.update(schema.interests).set(refresh).where(sameOpenRow).returning();
+    if (existing) return { ok: true, interest: existing, repeated: true };
+    try {
+      const [row] = await db
+        .insert(schema.interests)
+        .values({
+          kind: input.kind,
+          serviceId: input.serviceId,
+          preferredName: input.preferredName,
+          contactChannel: input.contactChannel,
+          contactValue: input.contactValue,
+          ...refresh,
+          consent: true,
+          origin: input.origin ?? null,
+          campaignId,
+          createdAt: now,
+        })
+        .returning();
+      return { ok: true, interest: row, repeated: false };
+    } catch (err) {
+      // 23505 on interests_open_idx: the same person submitted twice at once.
+      // The index is the guard; the next loop turn updates the winner's row.
+      if (unwrapCode(err) !== "23505") throw err;
+    }
+  }
+  throw new Error("could not save the interest");
+}
+
+function unwrapCode(err: unknown): string | undefined {
+  let cur: unknown = err;
+  for (let i = 0; i < 5 && cur && typeof cur === "object"; i++) {
+    const e = cur as { code?: unknown; cause?: unknown };
+    if (typeof e.code === "string" && /^\d{5}$/.test(e.code)) return e.code;
+    cur = e.cause;
+  }
+  return undefined;
 }
 
 /** Open interests of one kind, newest first, for the admin lists. */
@@ -84,8 +115,17 @@ export async function listInterests(kind: InterestKind, status: InterestStatus =
   return db
     .select()
     .from(schema.interests)
-    .where(and(eq(schema.interests.kind, kind), eq(schema.interests.status, status)))
+    .where(and(eq(schema.interests.kind, kind), eq(schema.interests.status, status), isNull(schema.interests.campaignId)))
     .orderBy(desc(schema.interests.createdAt));
+}
+
+/** Everyone registered for one campaign, oldest first, for Liliana's check before activating. */
+export async function listCampaignInterests(campaignId: string): Promise<Interest[]> {
+  return getDb()
+    .select()
+    .from(schema.interests)
+    .where(eq(schema.interests.campaignId, campaignId))
+    .orderBy(schema.interests.createdAt);
 }
 
 export type SetInterestStatusResult = { ok: true; interest: Interest } | { ok: false; error: "not_found" };

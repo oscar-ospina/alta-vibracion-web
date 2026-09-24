@@ -5,9 +5,10 @@ import { Button } from "@saas/ui";
 import { hasDatabase } from "@/db/client";
 import { loadAvailability } from "@/lib/agenda/availability";
 import { holdHours } from "@/lib/agenda/bookings";
-import { ACTIVE_SERVICES } from "@/lib/catalog";
+import { CAMPAIGN_CODE_RE, quote } from "@/lib/campaigns";
+import { ACTIVE_SERVICES, FIRST_SESSION, formatCOP } from "@/lib/catalog";
 import { whatsappUrl } from "@/lib/site";
-import { AgendaFlow, AgendaSkeleton } from "@/components/agenda/agenda-flow";
+import { AgendaFlow, AgendaSkeleton, type CampaignOffer } from "@/components/agenda/agenda-flow";
 
 export const metadata: Metadata = {
   title: "Agenda tu sesión",
@@ -23,14 +24,42 @@ export const dynamic = "force-dynamic";
  * form (client island). Without it: the manual path from the plan, a WhatsApp
  * button that asks for available times. Never simulated slots.
  */
-export default async function AgendaPage() {
+export default async function AgendaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ campana?: string }>;
+}) {
+  const { campana } = await searchParams;
   // Liliana pauses the offer by setting the service to `paused`: the agenda
   // then shows the manual path instead of a calendar nobody can buy from.
   let online = hasDatabase() && ACTIVE_SERVICES.length > 0;
   let slots: Awaited<ReturnType<typeof loadAvailability>> = [];
+  // A campaign link (plan section 5). Active: the flow shows its price and
+  // the server validates the contact. Anything else: say so, then continue
+  // at the general price, visibly.
+  let offer: CampaignOffer | null = null;
+  let campaignNotice: string | null = null;
   if (online) {
     try {
       slots = await loadAvailability();
+      const code = (campana ?? "").toUpperCase();
+      if (code && CAMPAIGN_CODE_RE.test(code)) {
+        const q = await quote(code, null);
+        if (q.state === "active") {
+          offer = {
+            code: q.campaign.code,
+            name: q.campaign.name,
+            priceCop: q.campaign.priceCop,
+            closesAt: q.campaign.closesAt?.toISOString() ?? null,
+          };
+        } else if (q.state !== "not_found") {
+          campaignNotice = `La oferta del encuentro «${q.campaign.name}» ya no está activa (${
+            q.state === "expired" ? "el plazo terminó" : q.state === "sold_out" ? "los cupos se agotaron" : q.state === "interest" ? "aún no se ha activado" : "está cerrada"
+          }). Lo que reserves aquí va al precio general de ${formatCOP(FIRST_SESSION.price)}.`;
+        }
+      } else if (campana) {
+        campaignNotice = "El enlace del encuentro no es válido. Lo que reserves aquí va al precio general.";
+      }
     } catch (err) {
       // Unreachable or unmigrated database: degrade to the manual path.
       console.error("agenda: availability unavailable", err);
@@ -51,9 +80,15 @@ export default async function AgendaPage() {
             : "Escríbenos por WhatsApp y te compartimos los horarios disponibles."}
       </p>
 
+      {campaignNotice && (
+        <p role="status" data-testid="campaign-notice" className="mt-4 rounded-lg bg-orange-50 px-4 py-3 text-sm font-semibold text-brand-ink">
+          {campaignNotice}
+        </p>
+      )}
+
       {online ? (
         <Suspense fallback={<AgendaSkeleton />}>
-          <AgendaFlow slots={slots} holdHours={holdHours()} />
+          <AgendaFlow slots={slots} holdHours={holdHours()} offer={offer} />
         </Suspense>
       ) : (
         <div className="mt-8" data-testid="agenda-fallback">
