@@ -4,9 +4,10 @@ import { notFound } from "next/navigation";
 import { Button, Card, CardContent, Label, cn } from "@saas/ui";
 import { hasDatabase } from "@/db/client";
 import { deliveryStage, getBookingWithReport, reportTemplate } from "@/lib/agenda/delivery";
-import { ADMIN_NOTICE, REPORT_STATUS_LABEL, STAGE_LABEL, STATUS_LABEL, type AdminNoticeKey } from "@/lib/agenda/labels";
+import { REPORT_STATUS_LABEL, STAGE_LABEL, STATUS_LABEL, adminNotice } from "@/lib/agenda/labels";
 import { BOGOTA, formatInZone } from "@/lib/agenda/time";
 import { bookingServiceLabel, formatCOP } from "@/lib/catalog";
+import { displayContact } from "@/lib/contact";
 import { setAttended, setFollowUpDone, setIntakeReceived, submitReport } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +53,7 @@ export default async function AdminBookingPage({
   const now = new Date();
   const stage = deliveryStage(b, report, now);
   const stageLabel = stage === "attended" || stage === "delivered" ? STAGE_LABEL[stage].label : STATUS_LABEL[stage].label;
-  const notice = aviso && aviso in ADMIN_NOTICE ? ADMIN_NOTICE[aviso as AdminNoticeKey] : null;
+  const notice = adminNotice(aviso);
   const confirmed = b.status === "confirmed";
 
   return (
@@ -78,7 +79,7 @@ export default async function AdminBookingPage({
               <Row label="Hora del cliente">{formatInZone(b.startsAt, b.clientTimeZone)} ({b.clientTimeZone})</Row>
             )}
             <Row label="Cliente">{b.customerName}</Row>
-            <Row label="Contacto">{b.contactValue} ({b.contactChannel})</Row>
+            <Row label="Contacto">{displayContact(b.contactChannel, b.contactValue)} ({b.contactChannel})</Row>
             {b.origin && <Row label="Origen">{b.origin}</Row>}
             <Row label="Etapa"><span data-testid="booking-stage" className="font-semibold">{stageLabel}</span></Row>
           </dl>

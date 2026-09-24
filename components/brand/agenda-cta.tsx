@@ -8,12 +8,11 @@ import { ROUTES } from "@/lib/site";
 import type { ServiceId } from "@/lib/catalog";
 
 /**
- * CTA into the in-app Agenda (story oscar-ospina/saas-planner#45). Replaces the
- * direct-WhatsApp BookingButton on the hero and the consultations grid: those
- * entry points now navigate to /agenda (optionally preselecting the consultation) and
- * fire an `open_agenda` funnel event; the `book_consultation` conversion now
- * fires at the end of the flow, on the WhatsApp handoff (source: "agenda").
- * Same fire-and-forget pattern as BookingButton — never blocks navigation.
+ * CTA into the in-app Agenda. Every entry point navigates to /agenda
+ * (optionally preselecting the consultation) and fires an `open_agenda` funnel
+ * event with its source; the `book_consultation` conversion fires at the end of
+ * the flow, on the WhatsApp handoff (source: "agenda"). Fire-and-forget: the
+ * click never blocks navigation and the anchor still SSRs.
  */
 
 export type AgendaSource = "hero" | "consultation" | "top_bar" | "nav";

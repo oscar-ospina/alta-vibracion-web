@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Gift, Lock, MessageCircle } from "lucide-react";
+import { Lock } from "lucide-react";
 import { Card, CardContent } from "@saas/ui";
-import { BookingButton } from "@/components/brand/booking-button";
+import { InterestForm } from "@/components/catalog/interest-form";
 import { FIRST_SESSION, NUMEROLOGY_DISCLAIMER, formatCOP, servicePath } from "@/lib/catalog";
-import { GIFT_MESSAGE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Regala Mi Mapa 729",
@@ -21,9 +20,10 @@ const STEPS = [
 /**
  * /regalar (plan section 7.1): the gift of the first session for another
  * adult. Same scope, 75 minutes, private summary, general price. The
- * assisted inquiry (P0) starts here; until its form ships, the CTA opens
- * WhatsApp with the gift named. No payment before Liliana confirms
- * availability, delivery and conditions. Server component.
+ * assisted inquiry (P0) is the form on the right: buyer's name, one channel,
+ * an optional message and the authorization to attend the inquiry. No data
+ * about the beneficiary, no payment before Liliana confirms availability,
+ * delivery and conditions.
  */
 export default function GiftPage() {
   return (
@@ -84,15 +84,7 @@ export default function GiftPage() {
               Antes del pago confirmaremos disponibilidad, forma de entrega y condiciones
               del regalo.
             </p>
-            <BookingButton source="gift" size="lg" className="w-full" message={GIFT_MESSAGE}>
-              <Gift className="size-5" aria-hidden />
-              Quiero regalar esta experiencia
-            </BookingButton>
-            <p className="flex items-start gap-2 text-xs text-muted-foreground">
-              <MessageCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              Por ahora la consulta se atiende por WhatsApp. No pedimos datos de la
-              otra persona en este paso.
-            </p>
+            <InterestForm service={{ ...FIRST_SESSION, cta: "Quiero regalar esta experiencia" }} variant="gift" />
           </CardContent>
         </Card>
       </div>

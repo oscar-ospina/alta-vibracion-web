@@ -7,6 +7,7 @@ import { getDb, schema } from "@/db/client";
 import { requireAdmin } from "@/lib/admin-auth-server";
 import { setBookingStatus } from "@/lib/agenda/bookings";
 import { markAttended, markFollowUpDone, markIntakeReceived, saveReport } from "@/lib/agenda/delivery";
+import { setInterestStatus } from "@/lib/interests";
 import { HHMM_RE, ISO_DATE_RE, addDays, bogotaInstant, weekdayOf } from "@/lib/agenda/time";
 import type { AdminNoticeKey } from "@/lib/agenda/labels";
 
@@ -121,4 +122,18 @@ export async function submitReport(formData: FormData) {
   if (status !== "draft" && status !== "reviewed" && status !== "approved") notifyBooking(id, "bad_status");
   const res = id ? await saveReport(id, { body, status }) : ({ ok: false, error: "not_found" } as const);
   notifyBooking(id, res.ok ? "saved" : res.error);
+}
+
+// Interests (lib/interests.ts): the three lists under /admin/interests.
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function markInterest(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const status = String(formData.get("status") ?? "");
+  if (status !== "contacted" && status !== "closed") redirect("/admin/interests?aviso=interest_bad_status");
+  const res = UUID_RE.test(id) ? await setInterestStatus(id, status) : ({ ok: false, error: "not_found" } as const);
+  revalidatePath("/admin/interests");
+  redirect(`/admin/interests?aviso=${res.ok ? "saved" : "interest_not_found"}`);
 }
