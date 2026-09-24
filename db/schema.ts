@@ -53,6 +53,45 @@ export const availabilityOverrides = pgTable(
   (t) => [index("availability_overrides_date_idx").on(t.date)],
 );
 
+export const campaignStatus = pgEnum("campaign_status", ["draft", "interest", "active", "closed"]);
+
+/**
+ * "Encuentro 729" offer (plan section 5). One row per event. The values are
+ * Liliana's: threshold, capacity, price and window are set before she
+ * announces the event, and activation is a manual admin action after she has
+ * checked the group. The price is copied onto each order; changing a campaign
+ * never rewrites an order (plan section 5, "Un precio aceptado queda guardado").
+ */
+export const campaigns = pgTable(
+  "campaigns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Public, unguessable code that goes on the QR: /encuentros/<code>. */
+    code: text("code").notNull(),
+    /** Event name as Liliana says it aloud, e.g. "Encuentro en casa de Marta". */
+    name: text("name").notNull(),
+    serviceId: text("service_id").notNull(),
+    priceCop: integer("price_cop").notNull(),
+    /** Distinct adults who must register interest before Liliana activates. */
+    threshold: integer("threshold").notNull(),
+    /** Promotional cupos protected for this campaign (plan: at most three initially). */
+    capacity: integer("capacity").notNull(),
+    status: campaignStatus("status").notNull().default("draft"),
+    /** Activation instant. */
+    opensAt: timestamp("opens_at", { withTimezone: true }),
+    /** Purchase deadline (plan: 48 hours after activation, editable). */
+    closesAt: timestamp("closes_at", { withTimezone: true }),
+    /** Whether the campaign price may be used to give the session (off by default). */
+    allowsGift: boolean("allows_gift").notNull().default(false),
+    /** Conditions shown to participants, versioned by hand. */
+    conditions: text("conditions").notNull().default(""),
+    conditionsVersion: integer("conditions_version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("campaigns_code_idx").on(t.code)],
+);
+
 export const bookingStatus = pgEnum("booking_status", [
   "pending_payment",
   "confirmed",
@@ -83,6 +122,8 @@ export const bookings = pgTable(
     clientTimeZone: text("client_time_zone").notNull(),
     /** Anonymous source tag from ?origen=, e.g. "encuentro-01". */
     origin: text("origin"),
+    /** The campaign whose price this booking took, when any. */
+    campaignId: uuid("campaign_id").references(() => campaigns.id),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -134,7 +175,7 @@ export const reports = pgTable("reports", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const interestKind = pgEnum("interest_kind", ["service", "gift", "company"]);
+export const interestKind = pgEnum("interest_kind", ["service", "gift", "company", "campaign"]);
 export const interestStatus = pgEnum("interest_status", ["new", "contacted", "closed"]);
 
 /**
@@ -169,6 +210,8 @@ export const interests = pgTable(
     status: interestStatus("status").notNull().default("new"),
     /** Anonymous source tag, e.g. a campaign code. */
     origin: text("origin"),
+    /** Kind `campaign`: the event this person registered for (plan section 5, "Umbral"). */
+    campaignId: uuid("campaign_id").references(() => campaigns.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     contactedAt: timestamp("contacted_at", { withTimezone: true }),
@@ -176,9 +219,10 @@ export const interests = pgTable(
   },
   (t) => [
     index("interests_status_idx").on(t.status, t.kind),
-    // One open interest per person, kind and service. Duplicate forms update it.
+    // One open interest per person, kind, service and campaign. Duplicate
+    // forms update it, so three forms from one person are still one person.
     uniqueIndex("interests_open_idx")
-      .on(t.kind, t.serviceId, t.contactValue)
+      .on(t.kind, t.serviceId, t.contactValue, sql`coalesce(${t.campaignId}::text, '')`)
       .where(sql`${t.status} = 'new'`),
   ],
 );
@@ -189,6 +233,8 @@ export type Booking = typeof bookings.$inferSelect;
 export type BookingStatus = Booking["status"];
 export type Report = typeof reports.$inferSelect;
 export type ReportStatus = Report["status"];
+export type Campaign = typeof campaigns.$inferSelect;
+export type CampaignStatus = Campaign["status"];
 export type Interest = typeof interests.$inferSelect;
 export type InterestKind = Interest["kind"];
 export type InterestStatus = Interest["status"];

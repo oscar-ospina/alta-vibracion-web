@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@saas/ui";
-import type { Interest, InterestKind } from "@/db/schema";
+import type { Interest } from "@/db/schema";
 import { hasDatabase } from "@/db/client";
 import { adminNotice } from "@/lib/agenda/labels";
 import { BOGOTA, formatInZone } from "@/lib/agenda/time";
@@ -19,7 +19,9 @@ export const metadata: Metadata = {
 
 const LINK = "text-brand-ink underline underline-offset-2";
 
-const SECTIONS: { kind: InterestKind; title: string; hint: string; testId: string }[] = [
+type ListKind = "gift" | "service" | "company";
+
+const SECTIONS: { kind: ListKind; title: string; hint: string; testId: string }[] = [
   {
     kind: "gift",
     title: "Regalos por consultar",
@@ -97,7 +99,7 @@ export default async function AdminInterestsPage({
       </div>
     );
   }
-  let lists: Record<InterestKind, Interest[]>;
+  let lists: Record<ListKind, Interest[]>;
   try {
     const [gift, service, company] = await Promise.all([
       listInterests("gift"),
