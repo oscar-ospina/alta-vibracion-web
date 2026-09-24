@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { track } from "@vercel/analytics";
 import { Bell } from "lucide-react";
 import {
   Button,
@@ -31,7 +32,14 @@ export function InterestCta({
   const [open, setOpen] = useState(false);
   const variant = service.line === "empresas" ? "company" : "service";
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        // Opens versus submits: the funnel of the "Avísame" dialog.
+        if (next) track("open_interest", { service: service.id });
+        setOpen(next);
+      }}
+    >
       <DialogTrigger asChild>
         <Button size={size} className={className} aria-label={`${service.cta}: ${service.name}`}>
           <Bell className="size-4" aria-hidden />

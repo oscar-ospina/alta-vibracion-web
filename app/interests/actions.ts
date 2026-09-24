@@ -1,7 +1,7 @@
 "use server";
 
 import { hasDatabase } from "@/db/client";
-import { isContactChannel, isValidContact, normalizeContact } from "@/lib/contact";
+import { contactError, isContactChannel, isValidContact, normalizeContact } from "@/lib/contact";
 import { interestKindFor, saveInterest } from "@/lib/interests";
 
 /**
@@ -46,11 +46,7 @@ export async function submitInterest(
     return { status: "error", message: "Elige cómo prefieres que te contactemos.", fallback: false };
   }
   if (!isValidContact(contactChannel, contactRaw)) {
-    return {
-      status: "error",
-      message: contactChannel === "email" ? "Revisa el correo electrónico." : "Revisa el número de WhatsApp (con indicativo de país).",
-      fallback: false,
-    };
+    return { status: "error", message: contactError(contactChannel), fallback: false };
   }
   if (!consent) {
     return { status: "error", message: "Necesitamos tu autorización para avisarte.", fallback: false };

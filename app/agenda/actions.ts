@@ -3,7 +3,7 @@
 import { hasDatabase } from "@/db/client";
 import { createBooking } from "@/lib/agenda/bookings";
 import { isValidTimeZone } from "@/lib/agenda/time";
-import { isContactChannel, isValidContact, normalizeContact } from "@/lib/contact";
+import { contactError, isContactChannel, isValidContact, normalizeContact } from "@/lib/contact";
 
 export type BookingFormState =
   | { status: "idle" }
@@ -48,10 +48,7 @@ export async function submitBooking(
     return { status: "error", message: "Elige cómo prefieres que te contactemos." };
   }
   if (!isValidContact(contactChannel, contactValue)) {
-    return {
-      status: "error",
-      message: contactChannel === "email" ? "Revisa el correo electrónico." : "Revisa el número de WhatsApp (con indicativo de país).",
-    };
+    return { status: "error", message: contactError(contactChannel) };
   }
   if (!isValidTimeZone(clientTimeZone)) {
     return { status: "error", message: "Elige tu zona horaria." };

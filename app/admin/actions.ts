@@ -132,7 +132,7 @@ export async function markInterest(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "");
-  if (status !== "contacted" && status !== "closed") redirect("/admin/interests?aviso=bad_status");
+  if (status !== "contacted" && status !== "closed") redirect("/admin/interests?aviso=interest_bad_status");
   const res = UUID_RE.test(id) ? await setInterestStatus(id, status) : ({ ok: false, error: "not_found" } as const);
   revalidatePath("/admin/interests");
   redirect(`/admin/interests?aviso=${res.ok ? "saved" : "interest_not_found"}`);

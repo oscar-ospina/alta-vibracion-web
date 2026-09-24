@@ -55,12 +55,12 @@ export const ADMIN_NOTICE = {
   empty: "Escribe el resumen antes de marcarlo como revisado o aprobado.",
   bad_status: "Estado del informe no válido.",
   interest_not_found: "Ese interés ya no existe.",
+  interest_bad_status: "Estado del interés no válido.",
 } as const;
 
-export const INTEREST_STATUS_LABEL: Record<"new" | "contacted" | "closed", string> = {
-  new: "Nuevo",
-  contacted: "Contactado",
-  closed: "Cerrado",
-};
-
 export type AdminNoticeKey = keyof typeof ADMIN_NOTICE;
+
+/** The notice for an `?aviso=` value, or null. Own keys only: `__proto__` is not a notice. */
+export function adminNotice(aviso: string | undefined): string | null {
+  return aviso && Object.hasOwn(ADMIN_NOTICE, aviso) ? ADMIN_NOTICE[aviso as AdminNoticeKey] : null;
+}

@@ -31,28 +31,25 @@ const CONSENT: Record<InterestVariant, string> = {
  * optional message and never asks about the beneficiary. Shows the plan's
  * thanks only after the server saved the row; a failure offers WhatsApp.
  */
-export function InterestForm({
-  service,
-  variant,
-  onSaved,
-}: {
-  service: Service;
-  variant: InterestVariant;
-  onSaved?: () => void;
-}) {
+export function InterestForm({ service, variant }: { service: Service; variant: InterestVariant }) {
   const [state, formAction, pending] = useActionState<InterestFormState, FormData>(
     submitInterest,
     { status: "idle" },
   );
+  // Controlled fields: a <form action> resets uncontrolled inputs when the
+  // action returns, which would wipe what the person typed on every error.
   const [channel, setChannel] = useState<"whatsapp" | "email">("whatsapp");
+  const [name, setName] = useState("");
+  const [contact, setContact] = useState("");
+  const [organization, setOrganization] = useState("");
+  const [topic, setTopic] = useState("");
+  const [message, setMessage] = useState("");
+  const [consent, setConsent] = useState(false);
   const uid = useId();
 
   useEffect(() => {
-    if (state.status === "saved") {
-      track("interest_submitted", { kind: state.kind, service: state.serviceId });
-      onSaved?.();
-    }
-  }, [state, onSaved]);
+    if (state.status === "saved") track("interest_submitted", { kind: state.kind, service: state.serviceId });
+  }, [state]);
 
   if (state.status === "saved") {
     return (
@@ -72,6 +69,8 @@ export function InterestForm({
         <Input
           id={`${uid}-name`}
           name="preferredName"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           placeholder="¿Cómo te llamas?"
           autoComplete="name"
           maxLength={80}
@@ -84,11 +83,11 @@ export function InterestForm({
         <>
           <div>
             <Label htmlFor={`${uid}-org`}>Organización</Label>
-            <Input id={`${uid}-org`} name="organization" autoComplete="organization" maxLength={120} required className="mt-2" />
+            <Input id={`${uid}-org`} name="organization" value={organization} onChange={(e) => setOrganization(e.target.value)} autoComplete="organization" maxLength={120} required className="mt-2" />
           </div>
           <div>
             <Label htmlFor={`${uid}-topic`}>Qué te gustaría explorar</Label>
-            <Input id={`${uid}-topic`} name="topic" maxLength={300} className="mt-2" />
+            <Input id={`${uid}-topic`} name="topic" value={topic} onChange={(e) => setTopic(e.target.value)} maxLength={300} className="mt-2" />
             <p className="mt-1 text-xs text-muted-foreground">Sin datos de empleados.</p>
           </div>
         </>
@@ -115,6 +114,8 @@ export function InterestForm({
         </fieldset>
         <Input
           name="contactValue"
+          value={contact}
+          onChange={(e) => setContact(e.target.value)}
           aria-label={channel === "whatsapp" ? "Tu número de WhatsApp" : "Tu correo"}
           placeholder={channel === "whatsapp" ? "+57 300 000 0000" : "tu@correo.com"}
           type={channel === "email" ? "email" : "tel"}
@@ -132,6 +133,8 @@ export function InterestForm({
           <textarea
             id={`${uid}-message`}
             name="message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
             maxLength={500}
             rows={3}
             className={cn(
@@ -146,7 +149,14 @@ export function InterestForm({
       )}
 
       <label className="flex items-start gap-2 text-sm text-foreground">
-        <input type="checkbox" name="consent" required className={cn("mt-1 accent-orange-700", FOCUS_RING)} />
+        <input
+          type="checkbox"
+          name="consent"
+          checked={consent}
+          onChange={(e) => setConsent(e.target.checked)}
+          required
+          className={cn("mt-1 accent-orange-700", FOCUS_RING)}
+        />
         <span>{CONSENT[variant]}</span>
       </label>
 

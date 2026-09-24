@@ -18,7 +18,12 @@ test("a future service registers interest once, even when the form is sent twice
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "Mi Camino 729" })).toBeVisible();
   await expect(dialog.getByText(/COP/)).toHaveCount(0);
-  await fillInterest(page, "Ana Interés", "+57 300 111 2233");
+  // A phone without a country code is refused, and the typed values survive the error.
+  await fillInterest(page, "Ana Interés", "300 111 2233");
+  await dialog.getByRole("button", { name: "Avísame cuando esté disponible" }).click();
+  await expect(page.getByTestId("interest-error")).toContainText("indicativo de país");
+  await expect(dialog.getByLabel("Tu nombre")).toHaveValue("Ana Interés");
+  await dialog.getByLabel("Tu número de WhatsApp").fill("+57 300 111 2233");
   await dialog.getByRole("button", { name: "Avísame cuando esté disponible" }).click();
   const saved = page.getByTestId("interest-saved");
   await expect(saved).toContainText("Te avisaremos cuando tengamos una propuesta lista.");
@@ -31,7 +36,8 @@ test("a future service registers interest once, even when the form is sent twice
   await page.getByRole("dialog").getByRole("button", { name: "Avísame cuando esté disponible" }).click();
   await expect(page.getByTestId("interest-saved")).toBeVisible();
 
-  const admin = await (await browser.newContext({ httpCredentials: { username: ADMIN_USER, password: ADMIN_PASSWORD } })).newPage();
+  const adminContext = await browser.newContext({ httpCredentials: { username: ADMIN_USER, password: ADMIN_PASSWORD } });
+  const admin = await adminContext.newPage();
   await admin.goto("/admin/interests");
   const rows = admin.getByTestId("interests-service").getByRole("listitem");
   await expect(rows).toHaveCount(1);
@@ -42,6 +48,7 @@ test("a future service registers interest once, even when the form is sent twice
   await rows.first().getByRole("button", { name: "Contactado" }).click();
   await expect(admin.getByTestId("admin-notice")).toHaveText("Guardado.");
   await expect(admin.getByTestId("interests-service")).toHaveCount(0);
+  await adminContext.close();
 });
 
 test("the gift inquiry reaches the admin without any data about the beneficiary", async ({ page, browser }) => {
@@ -56,12 +63,14 @@ test("the gift inquiry reaches the admin without any data about the beneficiary"
   await form.getByRole("button", { name: "Quiero regalar esta experiencia" }).click();
   await expect(page.getByTestId("interest-saved")).toContainText("antes de cualquier pago");
 
-  const admin = await (await browser.newContext({ httpCredentials: { username: ADMIN_USER, password: ADMIN_PASSWORD } })).newPage();
+  const adminContext = await browser.newContext({ httpCredentials: { username: ADMIN_USER, password: ADMIN_PASSWORD } });
+  const admin = await adminContext.newPage();
   await admin.goto("/admin/interests");
   const row = admin.getByTestId("interests-gift").getByRole("listitem").first();
   await expect(row).toContainText("Carlos Regala");
   await expect(row).toContainText("carlos@example.com");
   await expect(row).toContainText("Para mi pareja");
+  await adminContext.close();
 });
 
 test("a company registers its organization and topic", async ({ page, browser }) => {
@@ -76,9 +85,11 @@ test("a company registers its organization and topic", async ({ page, browser })
   await dialog.getByRole("button", { name: "Soy empresa y me interesa" }).click();
   await expect(page.getByTestId("interest-saved")).toBeVisible();
 
-  const admin = await (await browser.newContext({ httpCredentials: { username: ADMIN_USER, password: ADMIN_PASSWORD } })).newPage();
+  const adminContext = await browser.newContext({ httpCredentials: { username: ADMIN_USER, password: ADMIN_PASSWORD } });
+  const admin = await adminContext.newPage();
   await admin.goto("/admin/interests");
   const row = admin.getByTestId("interests-company").getByRole("listitem").first();
   await expect(row).toContainText("Acme SAS");
   await expect(row).toContainText("Un taller para el equipo");
+  await adminContext.close();
 });

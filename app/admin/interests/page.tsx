@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Button } from "@saas/ui";
 import type { Interest, InterestKind } from "@/db/schema";
 import { hasDatabase } from "@/db/client";
-import { ADMIN_NOTICE, type AdminNoticeKey } from "@/lib/agenda/labels";
+import { adminNotice } from "@/lib/agenda/labels";
 import { BOGOTA, formatInZone } from "@/lib/agenda/time";
 import { findService } from "@/lib/catalog";
 import { displayContact } from "@/lib/contact";
@@ -45,7 +45,7 @@ function InterestList({ rows, testId }: { rows: Interest[]; testId: string }) {
   return (
     <ul className="mt-2 space-y-2 text-sm" data-testid={testId}>
       {rows.map((r) => (
-        <li key={r.id} data-contact={r.contactValue} className="rounded-lg border px-3 py-2">
+        <li key={r.id} className="rounded-lg border px-3 py-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="whitespace-nowrap text-muted-foreground">{formatInZone(r.createdAt, BOGOTA)}</span>
             <span className="font-semibold">{r.preferredName}</span>
@@ -89,7 +89,7 @@ export default async function AdminInterestsPage({
   searchParams: Promise<{ aviso?: string }>;
 }) {
   const { aviso } = await searchParams;
-  const notice = aviso && aviso in ADMIN_NOTICE ? ADMIN_NOTICE[aviso as AdminNoticeKey] : null;
+  const notice = adminNotice(aviso);
   if (!hasDatabase()) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-10">

@@ -4,28 +4,13 @@
  */
 import assert from "node:assert/strict";
 import { after, beforeEach, describe, it } from "node:test";
-import { sql } from "drizzle-orm";
-import { getDb } from "../../db/client";
+import { resetAgenda as reset } from "./helpers";
 import { displayContact, isValidContact, normalizeContact } from "../../lib/contact";
 import { interestKindFor, listInterests, saveInterest, setInterestStatus } from "../../lib/interests";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is required for tests/db");
-}
 
-function assertDisposableDatabase() {
-  const url = process.env.DATABASE_URL ?? "";
-  if (/neon\.tech|vercel|supabase|amazonaws/i.test(url) && process.env.ALLOW_DESTRUCTIVE_TESTS !== "1") {
-    throw new Error("Refusing to truncate a managed database. Point DATABASE_URL at a local container.");
-  }
-}
 
-const db = getDb();
 
-async function reset() {
-  assertDisposableDatabase();
-  await db.execute(sql`truncate table interests`);
-}
 
 describe("contact normalization", () => {
   it("treats the same phone written three ways as one contact", () => {
@@ -43,11 +28,15 @@ describe("contact normalization", () => {
     assert.equal(displayContact("email", "ana@example.com"), "ana@example.com");
   });
 
-  it("validates the raw value per channel", () => {
+  it("validates the normalized value: international prefix and real digits for a phone", () => {
     assert.ok(isValidContact("email", "ana@example.com"));
     assert.ok(!isValidContact("email", "ana@"));
     assert.ok(isValidContact("whatsapp", "+34 600 00 00 00"));
+    assert.ok(isValidContact("whatsapp", "0057 (300) 123-4567"));
     assert.ok(!isValidContact("whatsapp", "123"));
+    // Punctuation alone and a local number without a prefix are refused.
+    assert.ok(!isValidContact("whatsapp", "......."));
+    assert.ok(!isValidContact("whatsapp", "300 123 4567"));
   });
 });
 

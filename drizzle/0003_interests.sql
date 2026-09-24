@@ -20,4 +20,8 @@ CREATE TABLE "interests" (
 );
 --> statement-breakpoint
 CREATE INDEX "interests_status_idx" ON "interests" USING btree ("status","kind");--> statement-breakpoint
-CREATE UNIQUE INDEX "interests_open_idx" ON "interests" USING btree ("kind","service_id","contact_value") WHERE "interests"."status" = 'new';
+CREATE UNIQUE INDEX "interests_open_idx" ON "interests" USING btree ("kind","service_id","contact_value") WHERE "interests"."status" = 'new';--> statement-breakpoint
+-- Bookings stored before contact normalization (lib/contact.ts): digits only for
+-- a phone (dropping a leading 00), lowercase for an email, so campaigns can match them.
+UPDATE "bookings" SET "contact_value" = regexp_replace(regexp_replace("contact_value", '\D', '', 'g'), '^00', '') WHERE "contact_channel" = 'whatsapp';--> statement-breakpoint
+UPDATE "bookings" SET "contact_value" = lower(trim("contact_value")) WHERE "contact_channel" = 'email';

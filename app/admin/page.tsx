@@ -15,7 +15,8 @@ import {
 } from "@/lib/agenda/delivery";
 import { BOGOTA, formatInZone, formatLongDate, todayInBogota } from "@/lib/agenda/time";
 import { bookingServiceLabel, formatCOP } from "@/lib/catalog";
-import { ADMIN_NOTICE, REPORT_STATUS_LABEL, STAGE_LABEL, STATUS_LABEL, type AdminNoticeKey } from "@/lib/agenda/labels";
+import { displayContact } from "@/lib/contact";
+import { REPORT_STATUS_LABEL, STAGE_LABEL, STATUS_LABEL, adminNotice } from "@/lib/agenda/labels";
 import { addOverride, cancelBooking, confirmBooking, deleteOverride } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -63,7 +64,7 @@ export default async function AdminPage({
   searchParams: Promise<{ aviso?: string }>;
 }) {
   const { aviso } = await searchParams;
-  const notice = aviso && aviso in ADMIN_NOTICE ? ADMIN_NOTICE[aviso as AdminNoticeKey] : null;
+  const notice = adminNotice(aviso);
   if (!hasDatabase()) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-10">
@@ -155,7 +156,7 @@ export default async function AdminPage({
                       )}
                     </td>
                     <td className="py-2 pr-3">
-                      {b.contactValue}
+                      {displayContact(b.contactChannel, b.contactValue)}
                       <span className="block text-xs text-muted-foreground">{b.contactChannel}</span>
                     </td>
                     <td className="py-2 pr-3 font-semibold" data-testid="admin-status">
