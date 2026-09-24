@@ -5,6 +5,7 @@ import { Button } from "@saas/ui";
 import { hasDatabase } from "@/db/client";
 import { loadAvailability } from "@/lib/agenda/availability";
 import { holdHours } from "@/lib/agenda/bookings";
+import { ACTIVE_SERVICES } from "@/lib/catalog";
 import { whatsappUrl } from "@/lib/site";
 import { AgendaFlow, AgendaSkeleton } from "@/components/agenda/agenda-flow";
 
@@ -23,7 +24,9 @@ export const dynamic = "force-dynamic";
  * button that asks for available times. Never simulated slots.
  */
 export default async function AgendaPage() {
-  let online = hasDatabase();
+  // Liliana pauses the offer by setting the service to `paused`: the agenda
+  // then shows the manual path instead of a calendar nobody can buy from.
+  let online = hasDatabase() && ACTIVE_SERVICES.length > 0;
   let slots: Awaited<ReturnType<typeof loadAvailability>> = [];
   if (online) {
     try {
@@ -43,7 +46,9 @@ export default async function AgendaPage() {
       <p className="mt-2 text-muted-foreground">
         {online
           ? "Elige tu sesión, la fecha y la hora. Tu cita queda confirmada cuando Liliana verifique el pago."
-          : "Escríbenos por WhatsApp y te compartimos los horarios disponibles."}
+          : ACTIVE_SERVICES.length === 0
+            ? "Las reservas están en pausa por ahora. Escríbenos por WhatsApp si quieres una fecha."
+            : "Escríbenos por WhatsApp y te compartimos los horarios disponibles."}
       </p>
 
       {online ? (

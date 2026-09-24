@@ -14,7 +14,7 @@ import {
   type BookingWithReport,
 } from "@/lib/agenda/delivery";
 import { BOGOTA, formatInZone, formatLongDate, todayInBogota } from "@/lib/agenda/time";
-import { findConsultation, formatCOP } from "@/lib/consultations";
+import { bookingServiceLabel, formatCOP } from "@/lib/catalog";
 import { ADMIN_NOTICE, REPORT_STATUS_LABEL, STAGE_LABEL, STATUS_LABEL, type AdminNoticeKey } from "@/lib/agenda/labels";
 import { addOverride, cancelBooking, confirmBooking, deleteOverride } from "./actions";
 
@@ -143,7 +143,7 @@ export default async function AdminPage({
                       <Link href={`/admin/bookings/${b.id}`} className={LINK}>{b.code}</Link>
                     </td>
                     <td className="py-2 pr-3">
-                      {findConsultation(b.serviceId)?.name ?? b.serviceId}
+                      {bookingServiceLabel(b)}
                       <span className="block text-xs text-muted-foreground">{formatCOP(b.priceCop)}</span>
                     </td>
                     <td className="py-2 pr-3">

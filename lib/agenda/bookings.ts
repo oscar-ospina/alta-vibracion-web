@@ -8,7 +8,7 @@ import { randomBytes } from "node:crypto";
 import { and, count, eq, gt, gte, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import type { Booking } from "@/db/schema";
-import { findConsultation } from "@/lib/consultations";
+import { findService } from "@/lib/catalog";
 import { loadAvailability } from "./availability";
 import { addMinutes } from "./time";
 
@@ -76,8 +76,10 @@ export async function createBooking(
   input: CreateBookingInput,
   now: Date = new Date(),
 ): Promise<CreateBookingResult> {
-  const service = findConsultation(input.serviceId);
-  if (!service || !service.bookable) return { ok: false, error: "invalid_service" };
+  // Only an `active` service sells (plan section 9). Expectation and paused
+  // services are rejected here, whatever the form said.
+  const service = findService(input.serviceId);
+  if (service?.status !== "active") return { ok: false, error: "invalid_service" };
 
   const offered = (await loadAvailability(now)).find((s) => s.startsAt === input.startsAt);
   if (!offered) return { ok: false, error: "unavailable" };

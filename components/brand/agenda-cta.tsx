@@ -5,7 +5,7 @@ import Link from "next/link";
 import { track } from "@vercel/analytics";
 import { Button } from "@saas/ui";
 import { ROUTES } from "@/lib/site";
-import type { ServiceId } from "@/lib/consultations";
+import type { ServiceId } from "@/lib/catalog";
 
 /**
  * CTA into the in-app Agenda (story oscar-ospina/saas-planner#45). Replaces the
@@ -16,7 +16,7 @@ import type { ServiceId } from "@/lib/consultations";
  * Same fire-and-forget pattern as BookingButton — never blocks navigation.
  */
 
-export type AgendaSource = "hero" | "consultation";
+export type AgendaSource = "hero" | "consultation" | "top_bar" | "nav";
 
 type AgendaCtaProps = {
   source: AgendaSource;

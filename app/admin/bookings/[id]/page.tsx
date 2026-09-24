@@ -6,7 +6,7 @@ import { hasDatabase } from "@/db/client";
 import { deliveryStage, getBookingWithReport, reportTemplate } from "@/lib/agenda/delivery";
 import { ADMIN_NOTICE, REPORT_STATUS_LABEL, STAGE_LABEL, STATUS_LABEL, type AdminNoticeKey } from "@/lib/agenda/labels";
 import { BOGOTA, formatInZone } from "@/lib/agenda/time";
-import { findConsultation, formatCOP } from "@/lib/consultations";
+import { bookingServiceLabel, formatCOP } from "@/lib/catalog";
 import { setAttended, setFollowUpDone, setIntakeReceived, submitReport } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +54,6 @@ export default async function AdminBookingPage({
   const stageLabel = stage === "attended" || stage === "delivered" ? STAGE_LABEL[stage].label : STATUS_LABEL[stage].label;
   const notice = aviso && aviso in ADMIN_NOTICE ? ADMIN_NOTICE[aviso as AdminNoticeKey] : null;
   const confirmed = b.status === "confirmed";
-  const service = findConsultation(b.serviceId);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-10">
@@ -73,7 +72,7 @@ export default async function AdminBookingPage({
       <Card className="mt-6">
         <CardContent>
           <dl className="space-y-1 text-sm">
-            <Row label="Sesión">{service?.name ?? b.serviceId} · {formatCOP(b.priceCop)}</Row>
+            <Row label="Sesión">{bookingServiceLabel(b)} · {formatCOP(b.priceCop)}</Row>
             <Row label="Hora de Colombia">{formatInZone(b.startsAt, BOGOTA)}</Row>
             {b.clientTimeZone !== BOGOTA && (
               <Row label="Hora del cliente">{formatInZone(b.startsAt, b.clientTimeZone)} ({b.clientTimeZone})</Row>

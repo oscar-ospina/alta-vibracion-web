@@ -6,7 +6,8 @@ test.beforeEach(async () => {
 });
 
 async function pickFirstSlot(page: Page) {
-  const calendarDays = page.locator(
+  // Scoped to <main>: the top bar's menu button also carries an aria-label.
+  const calendarDays = page.locator("main").locator(
     "button[aria-label]:not([disabled]):not([aria-label*='no disponible']):not([aria-label='Mes anterior']):not([aria-label='Mes siguiente'])",
   );
   await expect(calendarDays.first()).toBeVisible();

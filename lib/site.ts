@@ -40,9 +40,13 @@ export const SOCIAL = {
   instagram: "https://www.instagram.com/lili.altavibracion",
 } as const;
 
-/** Default prefilled message for the persistent top-bar / generic booking intent. */
+/** Default prefilled message for the generic booking intent. */
 export const BOOKING_MESSAGE =
-  "Hola Alta Vibración, quiero agendar una consulta de numerología.";
+  "Hola Alta Vibración, quiero agendar mi primera sesión de numerología.";
+
+/** Prefilled message for the gift inquiry while the assisted form is not live. */
+export const GIFT_MESSAGE =
+  "Hola, quiero regalar «Mi Mapa 729» a otra persona adulta. ¿Me cuentas las condiciones?";
 
 /** Build a wa.me click-to-chat URL with an optional prefilled message. */
 export function whatsappUrl(message: string = BOOKING_MESSAGE): string {
@@ -65,4 +69,13 @@ export const ROUTES = {
   contact: "/contact",
   terms: "/terms",
   privacy: "/privacy",
+  // Public marketing routes from the October plan (section 8) keep the plan's
+  // Spanish slugs: they go on QR codes and campaign links. Documented exception
+  // to the English-routes convention (docs/adr/2026-09-23-plan-v21.md).
+  yo: "/yo",
+  nosotros: "/nosotros",
+  celebremos: "/celebremos",
+  empresas: "/empresas",
+  gift: "/regalar",
+  meetups: "/encuentros",
 } as const;

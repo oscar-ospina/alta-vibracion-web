@@ -4,11 +4,12 @@
 
 Consumer site for Liliana Tobón's numerology practice (Alta Vibración, es-CO). Next.js 16 App Router, TypeScript, Tailwind v4, `@saas/ui` design system, Vercel. Code and routes in English, user-facing copy in Spanish.
 
-The launch plan lives outside the repo at `../Alta_Vibracion_729_Plan_Ejecucion_V1.md` (section 11 is the dev brief). Decisions are recorded in `docs/adr/`; superseded ones in `docs/archive/adr/`. The Match demo is a separate repo (`alta-code`) and is never wired into this site.
+The October plan lives outside the repo at `../Alta_Vibracion_729_Plan_Ejecucion_2309.md` (V2.1; section 8 is the web structure, section 12 the delivery order, section 13 the acceptance tests). Decisions are recorded in `docs/adr/`; superseded ones in `docs/archive/adr/`. The Match demo is a separate repo (`alta-code`) and is never wired into this site.
 
 ## Invariants
 
 - `@saas/ui` stays brand-agnostic. Brand assets, copy and compositions live here, never in the design system.
+- Only a service with `status: "active"` in `lib/catalog.ts` sells. `createBooking` enforces it; a future service never shows a price, a calendar or a payment step. The gift is `allowsGift` on YO-01, not a service. New public routes keep the plan's Spanish slugs (`/yo`, `/regalar`, `/encuentros`); see `docs/adr/2026-09-23-plan-v21.md`.
 - The agenda's double-booking guard is the partial unique index `bookings_active_slot_idx` on `bookings.starts_at`. Do not replace it with application checks.
 - Every mutating server action verifies admin credentials itself (`requireAdmin` in `lib/admin-auth-server.ts`). `proxy.ts` only challenges page loads.
 - A booking becomes `confirmed` only through the admin action, after Liliana verifies the transfer by hand. Attended, form-received and follow-up marks are nullable instants on `bookings`, never new `booking_status` values (the guard's predicate depends on them). An attended booking cannot be cancelled.

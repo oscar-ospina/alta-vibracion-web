@@ -172,10 +172,16 @@ describe("createBooking", () => {
     assert.deepEqual(res, { ok: false, error: "unavailable" });
   });
 
-  it("rejects the gift service", async () => {
+  it("rejects unknown and not-yet-active services", async () => {
     const [slot] = await loadAvailability();
+    // The retired gift id no longer exists as a service.
     const res = await createBooking({ ...input(slot.startsAt), serviceId: "reg-01" });
     assert.deepEqual(res, { ok: false, error: "invalid_service" });
+    // A service in preparation (plan section 13, first test) is rejected server-side.
+    const future = await createBooking({ ...input(slot.startsAt), serviceId: "yo-02" });
+    assert.deepEqual(future, { ok: false, error: "invalid_service" });
+    const egyptian = await createBooking({ ...input(slot.startsAt), serviceId: "yo-03" });
+    assert.deepEqual(egyptian, { ok: false, error: "invalid_service" });
   });
 
   it("lets exactly one of two concurrent bookings win the same slot", async () => {
