@@ -21,8 +21,8 @@ import {
 
 /** Earliest bookable day is tomorrow (Bogotá). Same-day requests go to WhatsApp. */
 export const LEAD_DAYS = 1;
-/** Four weeks out. */
-export const HORIZON_DAYS = 28;
+/** Thirty days out (plan section 5: dates available during the next 30 days). */
+export const HORIZON_DAYS = 30;
 
 export type Slot = {
   date: ISODate;

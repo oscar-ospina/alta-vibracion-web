@@ -29,6 +29,8 @@ import {
   shiftMonth,
 } from "@/lib/agenda/calendar";
 import { MonthCalendar } from "@/components/agenda/month-calendar";
+import { PaymentBox } from "@/components/agenda/payment-box";
+import type { PaymentInstructions } from "@/lib/payment";
 import { TimeZoneSelect, detectTimeZone } from "@/components/agenda/timezone-select";
 import { type BookingFormState, submitBooking } from "@/app/agenda/actions";
 
@@ -88,10 +90,12 @@ export function AgendaFlow({
   slots,
   holdHours,
   offer = null,
+  payment = null,
 }: {
   slots: Slot[];
   holdHours: number;
   offer?: CampaignOffer | null;
+  payment?: PaymentInstructions | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -159,9 +163,9 @@ export function AgendaFlow({
           </h2>
           <p className="text-muted-foreground">
             Guardamos tu horario por {holdHours} horas mientras Liliana verifica el pago.
-            Escríbele por WhatsApp con tu código para recibir los datos de pago.
             La cita queda confirmada cuando ella verifique la transferencia.
           </p>
+          <PaymentBox instructions={payment} amountCop={state.priceCop} code={state.code} />
           <dl className="space-y-1 rounded-xl bg-orange-50 p-4 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="font-semibold text-foreground">Código</dt>
@@ -185,6 +189,10 @@ export function AgendaFlow({
                 </dd>
               </div>
             )}
+            <div className="flex justify-between gap-4">
+              <dt className="font-semibold text-foreground">Valor</dt>
+              <dd className="text-right">{formatCOP(state.priceCop)}</dd>
+            </div>
             <div className="flex justify-between gap-4">
               <dt className="font-semibold text-foreground">Estado</dt>
               <dd>Pendiente de pago</dd>
@@ -276,7 +284,7 @@ export function AgendaFlow({
             <h2 className="mb-4 text-sm font-bold text-foreground">Selecciona la fecha</h2>
             {dates.length === 0 ? (
               <p className="text-sm text-muted-foreground" data-testid="no-slots">
-                No hay horarios abiertos en las próximas cuatro semanas. Escríbenos por
+                No hay horarios abiertos en los próximos 30 días. Escríbenos por
                 WhatsApp y buscamos una opción.
               </p>
             ) : (
@@ -355,7 +363,7 @@ export function AgendaFlow({
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Pago por transferencia. Lili te envía los datos.
+                {payment ? "Pago por Bre-B; verás la llave al reservar." : "Pago por transferencia. Lili te envía los datos."}
               </p>
             )}
           </div>

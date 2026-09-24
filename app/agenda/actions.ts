@@ -15,6 +15,7 @@ export type BookingFormState =
       serviceId: string;
       customerName: string;
       clientTimeZone: string;
+      priceCop: number;
     };
 
 function str(formData: FormData, key: string): string {
@@ -91,5 +92,6 @@ export async function submitBooking(
     serviceId: b.serviceId,
     customerName: b.customerName,
     clientTimeZone: b.clientTimeZone,
+    priceCop: b.priceCop,
   };
 }

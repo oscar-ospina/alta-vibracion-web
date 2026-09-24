@@ -7,6 +7,7 @@ import { loadAvailability } from "@/lib/agenda/availability";
 import { holdHours } from "@/lib/agenda/bookings";
 import { CAMPAIGN_CODE_RE, quote } from "@/lib/campaigns";
 import { ACTIVE_SERVICES, FIRST_SESSION, formatCOP } from "@/lib/catalog";
+import { paymentInstructions } from "@/lib/payment";
 import { whatsappUrl } from "@/lib/site";
 import { AgendaFlow, AgendaSkeleton, type CampaignOffer } from "@/components/agenda/agenda-flow";
 
@@ -103,7 +104,7 @@ export default async function AgendaPage({
 
       {online ? (
         <Suspense fallback={<AgendaSkeleton />}>
-          <AgendaFlow slots={slots} holdHours={holdHours()} offer={offer} />
+          <AgendaFlow slots={slots} holdHours={holdHours()} offer={offer} payment={paymentInstructions()} />
         </Suspense>
       ) : (
         <div className="mt-8" data-testid="agenda-fallback">

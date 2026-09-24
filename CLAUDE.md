@@ -16,6 +16,7 @@ The October plan lives outside the repo at `../Alta_Vibracion_729_Plan_Ejecucion
 - A booking becomes `confirmed` only through the admin action, after Liliana verifies the transfer by hand. Attended, form-received and follow-up marks are nullable instants on `bookings`, never new `booking_status` values (the guard's predicate depends on them). An attended booking cannot be cancelled.
 - No personal data in URLs, analytics events, logs or fixtures. Bookings and interests store a preferred name and one contact channel, normalized through `lib/contact.ts` (never infer a country code); an interest is never a sale, and a repeated form updates the open row (partial unique index `interests_open_idx`). A form never shows a success the server did not save. `reports` holds Liliana's session summary, shown to the client only once `approved` (`docs/adr/2026-09-18-delivery-in-admin.md`). The pre-session form stays outside the app until the legal texts are signed off.
 - Without `DATABASE_URL` the build must pass and `/agenda` must render the WhatsApp fallback. Never show simulated availability.
+- Payment details come from `PAYMENT_BREB_KEY` (server-only, `lib/payment.ts`): a Bre-B key, never a bank account number in code or pages. A manual booking from the admin (`createManualBooking`) skips the public rules but never the double-booking guard.
 - Legal copy in `content/terms.md` and `content/privacy.md` is a draft with `[POR CONFIRMAR]` markers. Do not remove the draft banner until Liliana signs off.
 
 ## Gotchas that cost time

@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdmin } from "@/lib/admin-auth-server";
-import { setBookingStatus } from "@/lib/agenda/bookings";
+import { createManualBooking, setBookingStatus } from "@/lib/agenda/bookings";
+import { isContactChannel, isValidContact, normalizeContact } from "@/lib/contact";
 import { markAttended, markFollowUpDone, markIntakeReceived, saveReport } from "@/lib/agenda/delivery";
 import { setInterestStatus } from "@/lib/interests";
 import { activateCampaign, closeCampaign, createCampaign } from "@/lib/campaigns";
@@ -195,4 +196,37 @@ export async function closeCampaignAction(formData: FormData) {
   const row = UUID_RE.test(id) ? await closeCampaign(id) : null;
   revalidatePath("/agenda");
   notifyCampaigns(row ? "saved" : "campaign_not_found");
+}
+
+// Manual booking (lib/agenda/bookings.ts createManualBooking): late payments,
+// gift redemptions and clients who wrote by WhatsApp.
+
+export async function createManualBookingAction(formData: FormData) {
+  await requireAdmin();
+  const customerName = String(formData.get("customerName") ?? "").trim().slice(0, 80);
+  const contactChannel = String(formData.get("contactChannel") ?? "");
+  const contactRaw = String(formData.get("contactValue") ?? "").trim().slice(0, 120);
+  const date = String(formData.get("date") ?? "");
+  const time = String(formData.get("time") ?? "").trim();
+  const priceCop = Number(formData.get("priceCop"));
+  const paid = formData.get("paid") === "on";
+  const note = String(formData.get("note") ?? "").trim().slice(0, 40) || null;
+  if (!isContactChannel(contactChannel) || !isValidContact(contactChannel, contactRaw)) notify("manual_bad_contact");
+  if (!ISO_DATE_RE.test(date) || addDays(date, 0) !== date) notify("bad_date");
+  if (!HHMM_RE.test(time)) notify("bad_time");
+  if (note && !/^[a-z0-9-]+$/i.test(note)) notify("manual_bad_values");
+  const res = await createManualBooking({
+    customerName,
+    contactChannel,
+    contactValue: normalizeContact(contactChannel, contactRaw),
+    date,
+    time,
+    priceCop,
+    paid,
+    note,
+  });
+  revalidatePath("/admin");
+  revalidatePath("/agenda");
+  if (!res.ok) notify(res.error === "slot_taken" ? "slot_taken" : res.error === "past" ? "manual_past" : "manual_bad_values");
+  redirect(`/admin/bookings/${res.booking.id}?aviso=saved`);
 }

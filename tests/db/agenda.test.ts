@@ -7,7 +7,7 @@ import { after, before, beforeEach, describe, it } from "node:test";
 import { getDb, schema } from "../../db/client";
 import { resetAgenda as reset } from "./helpers";
 import { computeSlots, loadAvailability } from "../../lib/agenda/availability";
-import { createBooking, setBookingStatus } from "../../lib/agenda/bookings";
+import { createBooking, createManualBooking, setBookingStatus } from "../../lib/agenda/bookings";
 import { bogotaInstant, formatInZone } from "../../lib/agenda/time";
 
 
@@ -257,5 +257,58 @@ describe("createBooking", () => {
     assert.ok(confirmed.ok);
     const second = await createBooking(input(slot.startsAt, "Nueva"));
     assert.deepEqual(second, { ok: false, error: "unavailable" });
+  });
+});
+
+describe("createManualBooking", () => {
+  beforeEach(reset);
+  after(reset);
+
+  const manual = (date: string, time: string, paid = false) => ({
+    customerName: "Pago tardío",
+    contactChannel: "whatsapp" as const,
+    contactValue: "573001234567",
+    date,
+    time,
+    priceCop: 149900,
+    paid,
+  });
+
+  it("books any future Bogotá time, confirmed when the payment was verified, and takes the slot", async () => {
+    const now = new Date("2026-10-01T12:00:00Z");
+    // A Friday at 10:00: not an offered slot, allowed by hand.
+    const res = await createManualBooking(manual("2026-10-02", "10:00", true), now);
+    assert.ok(res.ok);
+    assert.equal(res.booking.status, "confirmed");
+    assert.equal(res.booking.confirmedAt?.toISOString(), now.toISOString());
+    assert.equal(res.booking.origin, "manual");
+    assert.equal(res.booking.startsAt.toISOString(), "2026-10-02T15:00:00.000Z");
+
+    const pending = await createManualBooking({ ...manual("2026-10-05", "18:00"), note: "regalo-AV-ABC123" }, now);
+    assert.ok(pending.ok);
+    assert.equal(pending.booking.status, "pending_payment");
+    assert.equal(pending.booking.origin, "manual:regalo-AV-ABC123");
+    // The public agenda no longer offers that Monday.
+    const offered = await loadAvailability(now);
+    assert.ok(!offered.some((s) => s.date === "2026-10-05"));
+  });
+
+  it("never double-books: the same guard as the public flow", async () => {
+    const now = new Date("2026-10-01T12:00:00Z");
+    const [slot] = await loadAvailability(now);
+    const pub = await createBooking(input(slot.startsAt), now);
+    assert.ok(pub.ok);
+    const clash = await createManualBooking(manual(slot.date, slot.time, true), now);
+    assert.deepEqual(clash, { ok: false, error: "slot_taken" });
+    // Overlapping (18:30 inside the 18:00 block) is refused too.
+    const overlap = await createManualBooking(manual(slot.date, "18:30", true), now);
+    assert.deepEqual(overlap, { ok: false, error: "slot_taken" });
+  });
+
+  it("rejects the past and bad values", async () => {
+    const now = new Date("2026-10-01T12:00:00Z");
+    assert.deepEqual(await createManualBooking(manual("2026-09-30", "18:00"), now), { ok: false, error: "past" });
+    assert.deepEqual(await createManualBooking({ ...manual("2026-10-06", "18:00"), priceCop: -1 }, now), { ok: false, error: "bad_values" });
+    assert.deepEqual(await createManualBooking({ ...manual("2026-10-06", "18:00"), customerName: "A" }, now), { ok: false, error: "bad_values" });
   });
 });

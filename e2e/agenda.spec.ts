@@ -36,10 +36,17 @@ test("books the Monday–Thursday 18:00 slot, gets a code, and the slot disappea
   expect(code).toMatch(/^AV-[A-Z2-9]{6}$/);
   const handoff = panel.getByRole("link", { name: /Enviar mi código por WhatsApp/ });
   await expect(handoff).toHaveAttribute("href", new RegExp(encodeURIComponent(code)));
+  // Payment instructions: the Bre-B key, the amount and the code as reference.
+  const pay = panel.getByTestId("payment-box");
+  await expect(pay.getByTestId("breb-key")).toHaveText("@LILIANA729");
+  await expect(pay).toContainText("COP 149.900");
+  await expect(pay).toContainText(code);
+  await expect(pay).not.toContainText(/cuenta de ahorros|número de cuenta/i);
 
-  // Status page by code.
+  // Status page by code, with the same instructions while pending.
   await page.goto(`/agenda/${code}`);
   await expect(page.getByTestId("booking-status")).toHaveText("Pendiente de pago");
+  await expect(page.getByTestId("payment-box").getByTestId("breb-key")).toHaveText("@LILIANA729");
 
   // The day no longer offers a slot.
   await page.goto("/agenda");

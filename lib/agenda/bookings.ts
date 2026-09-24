@@ -12,7 +12,7 @@ import type { Booking } from "@/db/schema";
 import { findService } from "@/lib/catalog";
 import { countPromoUsed, findCampaignByCode, isRegistered, lockAndViewCampaign, viewOf } from "@/lib/campaigns";
 import { loadAvailability } from "./availability";
-import { addMinutes } from "./time";
+import { BOGOTA, addMinutes, bogotaInstant } from "./time";
 
 /** Unambiguous alphabet (no 0/O, 1/I). */
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -166,6 +166,86 @@ export async function createBooking(
       // Unique (same start) or exclusion (overlapping range): the slot is taken.
       if (pgErr?.code !== UNIQUE_VIOLATION && pgErr?.code !== EXCLUSION_VIOLATION) throw err;
       if (pgErr.constraint === "bookings_code_idx") continue; // retry with a new code
+      return { ok: false, error: "slot_taken" };
+    }
+  }
+  throw new Error("could not allocate a unique booking code");
+}
+
+export type ManualBookingInput = {
+  customerName: string;
+  contactChannel: "whatsapp" | "email";
+  /** Already normalized (lib/contact.ts). */
+  contactValue: string;
+  /** Bogotá calendar date and time; any time, not only the offered slots. */
+  date: string;
+  time: string;
+  priceCop: number;
+  /** Liliana already verified the payment (late transfer, gift redemption). */
+  paid: boolean;
+  campaignId?: string | null;
+  note?: string | null;
+};
+
+export type ManualBookingResult =
+  | { ok: true; booking: Booking }
+  | { ok: false; error: "slot_taken" | "bad_values" | "past" };
+
+/**
+ * A booking created by Liliana from the admin (plan section 7: a late payment
+ * after the hold lapsed, a gift being redeemed, a client who wrote by
+ * WhatsApp). It bypasses the public rules (lead day, offered slots, holds per
+ * contact) but never the double-booking guard: the same unique index and the
+ * overlap constraint decide, and a clash comes back as `slot_taken`.
+ */
+export async function createManualBooking(
+  input: ManualBookingInput,
+  now: Date = new Date(),
+): Promise<ManualBookingResult> {
+  if (input.customerName.trim().length < 2 || !Number.isInteger(input.priceCop) || input.priceCop < 0) {
+    return { ok: false, error: "bad_values" };
+  }
+  const startsAt = bogotaInstant(input.date, input.time);
+  if (Number.isNaN(startsAt.getTime())) return { ok: false, error: "bad_values" };
+  if (startsAt.getTime() <= now.getTime()) return { ok: false, error: "past" };
+  const db = getDb();
+  const rules = await db.select().from(schema.availabilityRules);
+  const durationMinutes = rules[0]?.durationMinutes ?? 135;
+  const endsAt = addMinutes(startsAt, durationMinutes);
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const code = generateBookingCode();
+    try {
+      const booking = await db.transaction(async (tx) => {
+        await sweepExpiredHolds(tx, now);
+        const [row] = await tx
+          .insert(schema.bookings)
+          .values({
+            code,
+            serviceId: "yo-01",
+            priceCop: input.priceCop,
+            campaignId: input.campaignId ?? null,
+            startsAt,
+            endsAt,
+            status: input.paid ? "confirmed" : "pending_payment",
+            confirmedAt: input.paid ? now : null,
+            holdExpiresAt: addMinutes(now, holdHours() * 60),
+            customerName: input.customerName.trim(),
+            contactChannel: input.contactChannel,
+            contactValue: input.contactValue,
+            clientTimeZone: BOGOTA,
+            origin: input.note ? `manual:${input.note}` : "manual",
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning();
+        return row;
+      });
+      return { ok: true, booking };
+    } catch (err) {
+      const pgErr = pgError(err);
+      if (pgErr?.code !== UNIQUE_VIOLATION && pgErr?.code !== EXCLUSION_VIOLATION) throw err;
+      if (pgErr.constraint === "bookings_code_idx") continue;
       return { ok: false, error: "slot_taken" };
     }
   }

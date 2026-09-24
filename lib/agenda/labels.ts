@@ -4,7 +4,7 @@ import type { BookingStatus } from "@/db/schema";
 export const STATUS_LABEL: Record<BookingStatus, { label: string; hint: string }> = {
   pending_payment: {
     label: "Pendiente de pago",
-    hint: "Tu horario está reservado mientras Liliana verifica el pago. Si aún no le has escrito, envíale tu código por WhatsApp.",
+    hint: "Tu horario está reservado mientras Liliana verifica el pago. Cuando pagues, envíale tu código por WhatsApp.",
   },
   confirmed: {
     label: "Confirmada",
@@ -61,6 +61,9 @@ export const ADMIN_NOTICE = {
   campaign_below_threshold: "Aún no se alcanza el umbral de interesados. Puedes activar igual marcando la casilla de confirmación.",
   campaign_not_activable: "Solo una campaña en borrador o recogiendo interés puede activarse.",
   campaign_bad_window: "La fecha de cierre debe ser posterior a ahora.",
+  manual_bad_contact: "Revisa el contacto: un WhatsApp con indicativo o un correo válido.",
+  manual_bad_values: "Revisa nombre, precio y nota (la nota solo admite letras, números y guiones).",
+  manual_past: "La fecha y hora ya pasaron.",
 } as const;
 
 export const CAMPAIGN_STATUS_LABEL: Record<"draft" | "interest" | "active" | "closed", string> = {

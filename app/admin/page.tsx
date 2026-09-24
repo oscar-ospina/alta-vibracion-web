@@ -17,7 +17,7 @@ import { BOGOTA, formatInZone, formatLongDate, todayInBogota } from "@/lib/agend
 import { bookingServiceLabel, formatCOP } from "@/lib/catalog";
 import { displayContact } from "@/lib/contact";
 import { REPORT_STATUS_LABEL, STAGE_LABEL, STATUS_LABEL, adminNotice } from "@/lib/agenda/labels";
-import { addOverride, cancelBooking, confirmBooking, deleteOverride } from "./actions";
+import { addOverride, cancelBooking, confirmBooking, createManualBookingAction, deleteOverride } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -216,6 +216,61 @@ export default async function AdminPage({
         Sesiones realizadas hace {FOLLOW_UP_DAYS} días o más sin seguimiento. Desaparecen al marcarlo, así nadie recibe dos mensajes.
       </p>
       <PendingList rows={followUps} testId="follow-ups" empty="Ningún seguimiento pendiente." />
+
+      <h2 className="mt-10 text-xl font-bold text-foreground">Reserva manual</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Para un pago que llegó después de vencer el plazo, un regalo que se agenda o alguien que
+        escribió por WhatsApp. Cualquier hora en hora de Colombia; si choca con otra reserva, no se
+        crea. Marca «pago verificado» solo si ya viste el ingreso en la cuenta.
+      </p>
+      <Card className="mt-3">
+        <CardContent>
+          <form action={createManualBookingAction} className="grid gap-4 md:grid-cols-3" data-testid="manual-booking-form">
+            <div>
+              <Label htmlFor="mb-name">Nombre</Label>
+              <Input id="mb-name" name="customerName" maxLength={80} required className="mt-2" />
+            </div>
+            <div>
+              <Label htmlFor="mb-channel">Canal</Label>
+              <select
+                id="mb-channel"
+                name="contactChannel"
+                className={cn("mt-2 h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm", FOCUS_RING)}
+              >
+                <option value="whatsapp">WhatsApp</option>
+                <option value="email">Correo</option>
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="mb-contact">Contacto</Label>
+              <Input id="mb-contact" name="contactValue" maxLength={120} required className="mt-2" placeholder="+57 300 000 0000" />
+            </div>
+            <div>
+              <Label htmlFor="mb-date">Fecha</Label>
+              <Input id="mb-date" name="date" type="date" required className="mt-2" />
+            </div>
+            <div>
+              <Label htmlFor="mb-time">Hora (Colombia)</Label>
+              <Input id="mb-time" name="time" type="time" required defaultValue="18:00" className="mt-2" />
+            </div>
+            <div>
+              <Label htmlFor="mb-price">Precio (COP, 0 si es un regalo ya pagado)</Label>
+              <Input id="mb-price" name="priceCop" type="number" min={0} defaultValue={149900} required className="mt-2" />
+            </div>
+            <div>
+              <Label htmlFor="mb-note">Nota de origen (opcional, sin espacios)</Label>
+              <Input id="mb-note" name="note" maxLength={40} className="mt-2" placeholder="regalo-AV-XXXXXX" />
+            </div>
+            <label className="flex items-center gap-2 self-end text-sm">
+              <input type="checkbox" name="paid" className={cn("accent-orange-700", FOCUS_RING)} />
+              Pago verificado: crear confirmada
+            </label>
+            <div className="self-end">
+              <Button type="submit">Crear reserva</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       <h2 className="mt-10 text-xl font-bold text-foreground">Excepciones de disponibilidad</h2>
       <p className="mt-1 text-sm text-muted-foreground">
