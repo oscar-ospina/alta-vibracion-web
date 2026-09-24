@@ -41,7 +41,7 @@ Regalos: la venta se confirma en **Regalos** (`/admin/gifts`) con «Pago verific
 ### 5. Pausar y reanudar la oferta
 
 1. En **Agenda**, al final, está «Reservas públicas». Pulsa «Pausar reservas» cuando no quieras vender (viaje, agenda llena, cambio de precio).
-2. Mientras está en pausa, `/agenda` muestra un aviso y el botón de WhatsApp; no aparece ningún horario. Las reservas ya hechas y el admin siguen funcionando.
+2. Mientras está en pausa, `/agenda` muestra un aviso y el botón de WhatsApp; no aparece ningún horario. Las reservas ya hechas y el admin siguen funcionando. Quien llegue con un bono de regalo o con la tarifa de un encuentro ve que sigue válido y que debe escribirte para la fecha; si una campaña está activa, su plazo de 48 horas sigue corriendo, así que ciérrala o avisa a las personas.
 3. «Reanudar reservas» vuelve a mostrar la agenda al instante.
 
 Para cerrar días concretos o abrir una hora extra (por ejemplo una mañana para España), usa «Excepciones de disponibilidad» en la misma página.
@@ -75,7 +75,7 @@ Con la sesión de admin abierta, descarga:
 - `/admin/export/campaigns` (campañas)
 - `/admin/export/gifts` (regalos)
 
-Guárdalos en tu carpeta privada. Contienen datos personales de clientes: no los compartas ni los subas a un grupo. Las horas van en hora de Colombia.
+Guárdalos en tu carpeta privada. Contienen datos personales de clientes: no los compartas ni los subas a un grupo. Las horas van en hora de Colombia con la fecha completa; los teléfonos van como dígitos con indicativo (573001234567) para que Excel no los convierta.
 
 ## Si algo falla
 

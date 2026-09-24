@@ -22,7 +22,7 @@ export default function AdminGuidePage() {
       </p>
       <h1 className="mt-4 text-3xl font-bold text-foreground">Guía de operación</h1>
       <div className="mt-6" data-testid="admin-guide">
-        <Prose gfm>{readAdminDoc("operacion")}</Prose>
+        <Prose gfm>{readAdminDoc("operations")}</Prose>
       </div>
     </article>
   );

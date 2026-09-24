@@ -73,12 +73,29 @@ test("CSV exports need the admin credentials and carry the records in Colombia t
   const body = await res.text();
   expect(body.charCodeAt(0)).toBe(0xfeff);
   const lines = body.trim().split("\r\n");
-  expect(lines[0]).toBe("codigo,sesion,precio_cop,inicio_colombia,estado,cliente,canal,contacto,zona_cliente,origen,campana_id,bono_id,creada,confirmada,formulario,atendida,seguimiento");
-  expect(lines[1]).toContain(created.booking.code);
-  expect(lines[1]).toContain('"Exportada, con coma"');
-  expect(lines[1]).toContain("export@example.com");
-  expect(lines[1]).toContain("6:00");
+  expect(lines[0]).toBe("sep=;"); // trim() removed the BOM asserted above
+  expect(lines[1]).toBe("codigo;sesion;precio_cop;inicio_colombia;estado;cliente;canal;contacto_digitos;zona_cliente;origen;campana_id;bono_id;creada;confirmada;formulario;atendida;seguimiento");
+  expect(lines[2]).toContain(created.booking.code);
+  expect(lines[2]).toContain("Exportada, con coma");
+  expect(lines[2]).toContain("export@example.com");
+  // Instants carry the year and sort: "YYYY-MM-DD 18:00" in Colombia time.
+  expect(lines[2]).toMatch(/;\d{4}-\d{2}-\d{2} 18:00;/);
 
+  // A formula-looking value from a public form is neutralized.
+  const evil = await createBooking({
+    serviceId: "yo-01",
+    startsAt: (await loadAvailability())[0].startsAt,
+    customerName: "=HYPERLINK(\"https://evil.example\")",
+    contactChannel: "whatsapp",
+    contactValue: "573001234567",
+    clientTimeZone: "America/Bogota",
+    origin: null,
+  });
+  if (!evil.ok) throw new Error("setup failed");
+  const again = await (await context.request.get("/admin/export/bookings")).text();
+  expect(again).toContain("'=HYPERLINK");
+  expect(again).not.toMatch(/;=HYPERLINK/);
+  expect(again).toContain(";573001234567;");
   for (const table of ["interests", "campaigns", "gifts"]) {
     const other = await context.request.get(`/admin/export/${table}`);
     expect(other.status()).toBe(200);
@@ -86,7 +103,7 @@ test("CSV exports need the admin credentials and carry the records in Colombia t
   expect((await context.request.get("/admin/export/users")).status()).toBe(404);
 
   const guide = await context.newPage();
-  await guide.goto("/admin/guia");
+  await guide.goto("/admin/guide");
   await expect(guide.getByTestId("admin-guide")).toContainText("Las cinco operaciones");
   await expect(guide.getByTestId("admin-guide")).toContainText("Qué puedes cambiar sin código");
   await context.close();

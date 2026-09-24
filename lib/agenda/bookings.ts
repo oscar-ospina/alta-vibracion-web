@@ -115,8 +115,12 @@ export async function createBooking(
   // services are rejected here, whatever the form said.
   const service = findService(input.serviceId);
   if (service?.status !== "active") return { ok: false, error: "invalid_service" };
-  // Liliana's pause switch (plan section 12, row 6) closes the public path; the admin still books by hand.
-  if (await bookingsPaused()) return { ok: false, error: "paused" };
+  // Liliana's pause switch (plan section 12, row 6) closes the public path; the
+  // admin still books by hand. A failed read (table not migrated yet, transient
+  // error) counts as not paused, as the agenda page does.
+  if (await bookingsPaused().catch((err) => (console.error("bookings: settings unavailable", err), false))) {
+    return { ok: false, error: "paused" };
+  }
 
   const offered = (await loadAvailability(now)).find((s) => s.startsAt === input.startsAt);
   if (!offered) return { ok: false, error: "unavailable" };

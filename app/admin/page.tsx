@@ -82,7 +82,13 @@ export default async function AdminPage({
   let followUps: Awaited<ReturnType<typeof listFollowUpsDue>> = [];
   let paused = false;
   try {
-    [bookings, overrides, reports, pendingIntake, pendingDeliveries, followUps, paused] = await Promise.all([
+    paused = await bookingsPaused();
+  } catch (err) {
+    // The switch must never blank the dashboard; a failed read shows "Abiertas".
+    console.error("admin: settings unavailable", err);
+  }
+  try {
+    [bookings, overrides, reports, pendingIntake, pendingDeliveries, followUps] = await Promise.all([
       listUpcomingBookings(now),
       getDb()
         .select()
@@ -93,7 +99,6 @@ export default async function AdminPage({
       listPendingIntake(),
       listPendingDeliveries(),
       listFollowUpsDue(now),
-      bookingsPaused(),
     ]);
   } catch (err) {
     console.error("admin: database unavailable", err);
@@ -118,7 +123,7 @@ export default async function AdminPage({
         {" · "}
         <Link href="/admin/gifts" className={LINK}>Regalos</Link>
         {" · "}
-        <Link href="/admin/guia" className={LINK}>Guía de operación</Link>.
+        <Link href="/admin/guide" className={LINK}>Guía de operación</Link>.
       </p>
 
       {notice && (
