@@ -19,9 +19,15 @@ type LogoProps = {
 };
 
 /**
- * Alta Vibración logo lockup. Renders the brand SVG (orange gradient mark +
- * violet→orange swoosh) and, by default, links to Home (AC oscar-ospina/saas-planner#20).
- * Server component — no interactivity, no client boundary needed.
+ * Alta Vibración logo lockup. Renders the brand SVG and, by default, links to Home
+ * (AC oscar-ospina/saas-planner#20). Both SVGs carry the exact paints of the Figma
+ * component "Logo horizontal" (8:634): the orange gradient mark, and two violet→orange
+ * gradients (#a43ff2 → #f37d3e) on the tail of the "A" and on the swoosh over "lt";
+ * the rest of the wordmark is solid #f37d3e. `mark` is that same mark on its own;
+ * the favicon (app/icon.svg) is a copy of public/logo-mark.svg, so change both together.
+ * No "use client" and no state or effects: it renders as a server component in the
+ * Footer and as part of the client tree inside TopBar (a client component), so keep
+ * it free of server-only code and hooks.
  */
 export function Logo({ variant = "horizontal", href = "/", className }: LogoProps) {
   const { src, width, height } = VARIANTS[variant];
