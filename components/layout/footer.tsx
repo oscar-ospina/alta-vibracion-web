@@ -8,36 +8,65 @@ const LEGAL_LINKS = [
   { href: ROUTES.privacy, label: "Política de Privacidad" },
 ];
 
-const linkClass =
-  "inline-flex rounded-md transition-colors hover:text-foreground focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring";
+const focusRing =
+  "focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring";
+
+/** Figma "Button / States" Type=Tertiary, Size=Medium: 40px tall, 12px side padding,
+ *  radius 8, Body/B1 Regular #363744, hover fill #ededf1 (neutral-100 = `muted`). */
+const legalLinkClass = `inline-flex h-10 items-center rounded-lg px-3 text-body-b1-regular text-foreground transition-colors hover:bg-muted ${focusRing}`;
 
 /**
- * Site footer on every route (stories oscar-ospina/saas-planner#21 / #36). Faithful to
- * the Figma design: logo + "Síguenos" social row · divider · legal links + copyright.
+ * Site footer on every route (stories oscar-ospina/saas-planner#21 / #36), built from
+ * the Figma footer (182:3933 at 1440, 937:20097 at 767, 937:19516 at 350): logo +
+ * "Síguenos" social row · divider · legal links + copyright.
+ *
+ * Fidelity: page color (#f6f6f9) with no top border or margin, so the last section's
+ * own bottom padding is the only separation. 16px vertical padding and 8px gaps; the
+ * side padding is `container-page` (96px from 950px, 32px below), and `max-md:px-8`
+ * keeps Figma's 32px on phones, where the page sections use 20px. Logo 297×40
+ * (286×38.5 below 768px). "Síguenos" is Body/B1 Regular with an 8px gap to the icon.
+ * The divider is Figma's Surfaces ink (#272f4e, `surface-ink`) at 8%. Legal links are
+ * Figma's Tertiary buttons (see `legalLinkClass`), 4px apart; the copyright (Body/B2)
+ * follows 16px after them and wraps 16px below when the row runs out of room (below
+ * about 1000px). Below 640px the social row drops under the logo and the links stack
+ * one per line, as in the 350 frame; every row stays left-aligned.
+ *
+ * Deliberate deviations:
+ * - Content is capped by `container-page` (1248px), aligned with the sections; the
+ *   1920 frame lets the footer run to 1728px.
+ * - Instagram only: TikTok comes back when the account launches (lib/site.ts SOCIAL).
+ * - Copyright copy and color: our wording, and `muted-foreground` (#565973, 6.34:1 on
+ *   the page) because Figma's #363744 at 60% is 3.48:1, below AA for 14px text.
+ * - All three links use the Medium button padding; the 1440 frame gives "Contacto"
+ *   the Small one (8px), the phone frames use Medium for all.
+ * - `pb-[100px]` below the content reserves room for the fixed WhatsApp FAB (80px,
+ *   20px from the bottom-right corner, so its top edge sits 100px above the viewport
+ *   bottom): scrolled to the end, the last row stays 16px clear of it.
+ *
  * The contact channels (correo / teléfono / WhatsApp) live on the /contact page (linked
- * here) and the WhatsApp FAB — the footer mirrors the design's social-first layout
- * rather than duplicating the contact icons. Server component.
+ * here) and the WhatsApp FAB; the footer keeps the design's social-first layout
+ * instead of repeating the contact icons. Server component.
  */
 export function Footer() {
   return (
-    <footer className="mt-12 border-t border-neutral-100 bg-card pb-16">
-      {/* pb-16 reserves room for the fixed WhatsApp FAB (#23) at the bottom-right. */}
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-10">
+    <footer className="bg-background pb-[100px]">
+      <div className="container-page flex flex-col gap-2 py-4 max-md:px-8">
         {/* Row 1: logo + "Síguenos" / social */}
-        <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between sm:gap-4">
-          <Logo variant="horizontal" className="h-[30px] w-auto" />
+        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+          {/* Width-driven so it can still shrink below the 350px frame. */}
+          <Logo variant="horizontal" className="h-auto w-[286px] max-w-full md:w-[297px]" />
 
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-foreground">Síguenos</span>
+          <div className="flex items-center gap-2">
+            <span className="text-body-b1-regular text-foreground">Síguenos</span>
             <a
               href={SOCIAL.instagram}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Síguenos en Instagram"
-              className={`${linkClass} transition-transform hover:scale-105`}
+              className={`inline-flex rounded-full motion-safe:transition-transform motion-safe:hover:scale-105 ${focusRing}`}
             >
-              {/* Brand social glyph from Figma — self-contained #3D3F4F circle + mark.
-                  Plain <img> keeps the SVG its own document (no gradient-id clashes). */}
+              {/* Brand social glyph from Figma (214:6987): self-contained #3D3F4F circle
+                  + mark. Plain <img> keeps the SVG its own document (no gradient-id clashes). */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/social-instagram.svg"
@@ -51,27 +80,22 @@ export function Footer() {
           </div>
         </div>
 
-        <hr className="border-neutral-100" />
+        <hr className="border-surface-ink/8" />
 
-        {/* Row 2: legal links (prominent — foreground/16px per Figma node 182:3933,
-            Body/B1 Regular #363744) + recessed copyright (Body/B2, muted). */}
-        <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between sm:gap-4">
+        {/* Row 2: legal links + copyright */}
+        <div className="flex flex-col items-start gap-4 sm:flex-row sm:flex-wrap sm:items-center">
           <nav
             aria-label="Enlaces legales"
-            className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-base"
+            className="flex flex-col items-start gap-1 sm:flex-row sm:items-center"
           >
             {LEGAL_LINKS.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={`${linkClass} text-foreground hover:underline`}
-              >
+              <Link key={l.href} href={l.href} className={legalLinkClass}>
                 {l.label}
               </Link>
             ))}
           </nav>
 
-          <p className="text-xs text-muted-foreground">
+          <p className="text-body-b2-regular text-muted-foreground">
             © 2026 Alta Vibración. Todos los derechos reservados.
           </p>
         </div>

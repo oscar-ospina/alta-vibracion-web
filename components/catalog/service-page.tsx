@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Check, Gift, Sparkles, Video } from "lucide-react";
-import { Badge, Card, CardContent } from "@saas/ui";
+import { Check, Gift } from "lucide-react";
+import { Card, CardContent } from "@saas/ui";
 import { AgendaCta } from "@/components/brand/agenda-cta";
 import { GiftCta } from "@/components/brand/gift-cta";
 import { GiftBlock } from "@/components/catalog/gift-block";
 import { InterestCta } from "@/components/catalog/interest-cta";
+import { CTA, CTA_LG, CTA_OUTLINE, ServiceStatusBadge } from "@/components/catalog/service-card";
 import {
   EXPECTATION_NOTE,
   NUMEROLOGY_DISCLAIMER,
@@ -20,12 +21,18 @@ import {
  *   the gift block when the service allows it;
  * - in preparation: the expectation template (descriptor, "En preparación",
  *   interest CTA) with no price, no calendar, no payment.
+ *
+ * It speaks the card's language so the page never contradicts the card that
+ * links to it: the same ServiceStatusBadge, the buy card white with no border or
+ * shadow (radius 16, padding 24, 20px between blocks), the price in Title/Titel
+ * Medium, the 49px Size=Large CTAs and the same paused note. The page sits in
+ * the shared `container-page`, so its edges line up with the top bar and footer.
  */
 export function ServicePage({ service, extra }: { service: Service; extra?: React.ReactNode }) {
   const line = findLine(service.line)!;
   const sellable = isSellable(service);
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-10">
+    <div className="container-page py-12">
       <p className="text-sm">
         <Link href={line.path} className="text-brand-ink underline underline-offset-2">
           ← {line.title}
@@ -34,17 +41,7 @@ export function ServicePage({ service, extra }: { service: Service; extra?: Reac
 
       <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <div>
-          {sellable ? (
-            <Badge className="border-transparent bg-violet-100 text-violet-700">
-              <Video className="size-3.5" aria-hidden />
-              Virtual · {service.durationMinutes} min
-            </Badge>
-          ) : (
-            <Badge className="border-transparent bg-orange-50 text-brand-ink">
-              <Sparkles className="size-3.5" aria-hidden />
-              En preparación
-            </Badge>
-          )}
+          <ServiceStatusBadge service={service} />
           <h1 className="mt-3 text-3xl font-bold text-foreground sm:text-4xl">{service.name}</h1>
           <p className="mt-4 max-w-2xl text-lg text-muted-foreground">{service.description}</p>
 
@@ -73,23 +70,23 @@ export function ServicePage({ service, extra }: { service: Service; extra?: Reac
                 Si quieres, te avisamos cuando esta propuesta esté lista. {EXPECTATION_NOTE}
               </p>
               <div className="mt-6">
-                <InterestCta service={service} size="lg" />
+                <InterestCta service={service} size="lg" className={CTA_LG} />
               </div>
             </>
           )}
         </div>
 
         {sellable && (
-          <Card className="lg:sticky lg:top-24" data-testid="service-buy-card">
-            <CardContent className="flex flex-col gap-4">
+          <Card className="border-0 shadow-none lg:sticky lg:top-24" data-testid="service-buy-card">
+            <CardContent className="flex flex-col gap-5">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Precio
                 </p>
-                <p className="font-display text-3xl font-semibold text-foreground">
+                <p className="font-display text-title-titel-medium text-foreground">
                   {formatCOP(service.price)}
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-2 text-body-b2-regular text-muted-foreground">
                   Sesión individual de {service.durationMinutes} minutos por Google Meet.
                   Pago por transferencia, confirmado a mano.
                 </p>
@@ -98,20 +95,25 @@ export function ServicePage({ service, extra }: { service: Service; extra?: Reac
                 <AgendaCta
                   source="consultation"
                   size="lg"
-                  className="w-full"
+                  className={CTA}
                   consultationId={service.id}
                   eventProps={{ service: service.id }}
                 >
                   {service.cta}
                 </AgendaCta>
               ) : (
-                <p className="rounded-lg bg-orange-50 px-3 py-2 text-sm text-brand-ink">
+                <p className="rounded-lg bg-orange-100 px-3 py-2 text-body-b2-regular text-orange-900">
                   Reservas en pausa por ahora. Escríbenos si quieres una fecha.
                 </p>
               )}
               {service.allowsGift && (
-                <GiftCta source="service_page" size="lg" className="w-full" aria-label={`Regalar esta cita: ${service.name}`}>
-                  <Gift className="size-5" aria-hidden />
+                <GiftCta
+                  source="service_page"
+                  size="lg"
+                  className={CTA_OUTLINE}
+                  aria-label={`Regalar esta cita: ${service.name}`}
+                >
+                  <Gift className="size-4" aria-hidden />
                   Regalar esta cita
                 </GiftCta>
               )}

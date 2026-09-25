@@ -118,3 +118,75 @@ test("the agenda only offers the first session, whatever the URL says", async ({
   await expect(page.getByTestId("agenda-service")).toHaveText("Mi Mapa 729");
   await expect(page.getByText("COP 149.900")).toBeVisible();
 });
+
+test("the home bar is transparent over the hero only while the page is at the top", async ({ page }) => {
+  await page.goto("/");
+  const bar = page.getByRole("banner");
+  const pageColor = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await expect(bar).toHaveAttribute("data-over-hero", "");
+  await expect(bar).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+
+  // Any scroll turns it solid, so nothing scrolls under a transparent bar.
+  await page.evaluate(() => window.scrollTo(0, 1));
+  await expect(bar).not.toHaveAttribute("data-over-hero");
+  await expect(bar).toHaveCSS("background-color", pageColor);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(bar).toHaveAttribute("data-over-hero", "");
+  await expect(bar).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+
+  // A reload restores the scroll further down: solid, with no fade in.
+  await page.evaluate(() => window.scrollTo(0, 1500));
+  await page.reload();
+  await expect(bar).not.toHaveAttribute("data-over-hero");
+  await expect(bar).toHaveCSS("transition-duration", "0s");
+  await expect(bar).toHaveCSS("background-color", pageColor);
+
+  // Other routes always have the solid bar.
+  await page.goto("/yo");
+  await expect(bar).not.toHaveAttribute("data-over-hero");
+  await expect(bar).toHaveCSS("background-color", pageColor);
+});
+
+test("the menu opened over the hero is one solid sheet with the bar, its links on the gutter", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 800 } });
+  const page = await context.newPage();
+  await page.goto("/");
+  const bar = page.getByRole("banner");
+  const pageColor = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await expect(bar).toHaveAttribute("data-over-hero", "");
+
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  const nav = page.getByTestId("mobile-nav");
+  await expect(nav).toHaveCSS("background-color", pageColor);
+  await expect(bar).not.toHaveAttribute("data-over-hero");
+  await expect(bar).toHaveCSS("background-color", pageColor);
+
+  // The link text starts where the logo does.
+  const logoLeft = (await bar.getByRole("link", { name: "Alta Vibración — Inicio" }).boundingBox())!.x;
+  const textLeft = await nav.getByRole("link", { name: "Yo · 7", exact: true }).evaluate((a) => {
+    const range = document.createRange();
+    range.selectNodeContents(a);
+    return range.getBoundingClientRect().left;
+  });
+  expect(Math.abs(textLeft - logoLeft)).toBeLessThanOrEqual(1);
+
+  await page.keyboard.press("Escape");
+  await expect(nav).toHaveCount(0);
+  await expect(bar).toHaveAttribute("data-over-hero", "");
+  await context.close();
+});
+
+test("without JavaScript the home bar stays solid, with dark links", async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto("/");
+  const bar = page.getByRole("banner");
+  const [pageColor, inkColor] = await page.evaluate(() => {
+    const body = getComputedStyle(document.body);
+    return [body.backgroundColor, body.color];
+  });
+  await expect(bar).toHaveCSS("background-color", pageColor);
+  // Desktop Chrome is 1280px wide, where the links sit inline in the bar.
+  await expect(bar.getByRole("link", { name: "Yo · 7", exact: true })).toHaveCSS("color", inkColor);
+  await context.close();
+});
