@@ -27,6 +27,19 @@ export function detectTimeZone(): string {
   }
 }
 
+/**
+ * Time-zone picker for the booking form. It deliberately wears the DS Input's
+ * resting look (44px tall, 8px radius, 1px border-input outline, transparent
+ * fill, 16px side padding, 16px text dropping to 14px from md up) because the
+ * name and contact Inputs it shares the form with live in agenda-flow.tsx,
+ * which stays on the DS style until its open PRs land. The kit's select (Figma
+ * 789:28085: borderless neutral-50 fill, 40px tall, 24px chevron icon) arrives
+ * with the kit restyle of the whole form, together with agenda-flow.tsx. Focus
+ * shows the 3px orange outline of the form's other custom controls: the DS
+ * Input's box-shadow focus ring does not render in this app (the Input only
+ * turns its border orange), the same gap app/brand.css patches for the DS
+ * Button. A native <select> keeps the browser's chevron.
+ */
 export function TimeZoneSelect({
   id,
   value,
@@ -57,7 +70,7 @@ export function TimeZoneSelect({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          "mt-2 h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm text-foreground",
+          "mt-2 h-11 w-full rounded-lg border border-input bg-transparent px-4 text-base text-foreground shadow-xs md:text-sm",
           FOCUS_RING,
         )}
       >
