@@ -4,7 +4,7 @@ The Alta Vibración site: Liliana Tobón's online numerology practice (Spanish, 
 
 > *"No es casualidad. Es vibración."*
 
-Live at <https://alta-vibracion-web.vercel.app>.
+Live at <https://altavibracion.co>. DNS lives at GoDaddy (A record on the apex, CNAME on `www`); Vercel redirects `www` to the apex with a 308. <https://alta-vibracion-web.vercel.app> keeps answering.
 
 ## Status (2026-09-23)
 
@@ -19,7 +19,7 @@ Following `../Alta_Vibracion_729_Plan_Ejecucion_2309.md` (plan V2.1, October 202
 - Delivery in `/admin` since 2026-09-18: per-booking page with form-received, session-attended and day-14 follow-up marks; a report editor (draft / reviewed / approved, template from the plan's section 3) whose approved text shows on the client's `/agenda/[code]` page; pending lists for forms, deliveries and follow-ups; `/admin/script` with the operating script and the seven-day plan (`content/admin/`). Decision in [`docs/adr/2026-09-18-delivery-in-admin.md`](docs/adr/2026-09-18-delivery-in-admin.md).
 - Not built yet (in the order of the plan's section 12): campaigns "Encuentro 729" (`/encuentros/[codigo]`), Bre-B payment instructions and manual bookings from the admin, gift orders with voucher codes, CSV export and the operating guide. Deferred: survey, newsletter, payment gateway, the pre-session form itself (external until the legal texts are signed).
 
-Before public launch: fill the 19 `[POR CONFIRMAR]` markers in `content/terms.md` and `content/privacy.md` and get them reviewed (one names the fields the agenda stores), define the gift conditions (vigencia, cambios, reembolso) before gift orders can be paid (the gift is `allowsGift` on YO-01; orders arrive in delivery step 4), set `NEXT_PUBLIC_SITE_URL` to the real host, add an OpenGraph image.
+Before public launch: fill the 19 `[POR CONFIRMAR]` markers in `content/terms.md` and `content/privacy.md` and get them reviewed (one names the fields the agenda stores), define the gift conditions (vigencia, cambios, reembolso) before gift orders can be paid (the gift is `allowsGift` on YO-01; orders arrive in delivery step 4), add an OpenGraph image.
 
 ## Stack
 
