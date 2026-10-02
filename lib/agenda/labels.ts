@@ -56,7 +56,19 @@ export const ADMIN_NOTICE = {
   bad_status: "Estado del informe no válido.",
   interest_not_found: "Ese interés ya no existe.",
   interest_bad_status: "Estado del interés no válido.",
+  campaign_not_found: "Esa campaña no existe.",
+  campaign_bad_values: "Revisa los valores: precio, umbral y cupos deben ser enteros positivos.",
+  campaign_below_threshold: "Aún no se alcanza el umbral de interesados. Puedes activar igual marcando la casilla de confirmación.",
+  campaign_not_activable: "Solo una campaña en borrador o recogiendo interés puede activarse.",
+  campaign_bad_window: "La fecha de cierre debe ser posterior a ahora.",
 } as const;
+
+export const CAMPAIGN_STATUS_LABEL: Record<"draft" | "interest" | "active" | "closed", string> = {
+  draft: "Borrador",
+  interest: "Recogiendo interés",
+  active: "Activa",
+  closed: "Cerrada",
+};
 
 export type AdminNoticeKey = keyof typeof ADMIN_NOTICE;
 

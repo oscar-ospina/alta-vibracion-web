@@ -24,7 +24,7 @@ export default defineConfig({
   projects: [
     {
       name: "agenda",
-      testMatch: /agenda\.spec\.ts|admin\.spec\.ts|catalog\.spec\.ts|delivery\.spec\.ts|interests\.spec\.ts/,
+      testMatch: /agenda\.spec\.ts|admin\.spec\.ts|catalog\.spec\.ts|delivery\.spec\.ts|interests\.spec\.ts|campaigns\.spec\.ts/,
       use: { baseURL: `http://localhost:${DB_PORT}` },
     },
     {

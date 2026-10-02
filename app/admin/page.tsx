@@ -109,7 +109,9 @@ export default async function AdminPage({
         se muestran en hora de Colombia.{" "}
         <Link href="/admin/script" className={LINK}>Guion y plan de siete días</Link>
         {" · "}
-        <Link href="/admin/interests" className={LINK}>Intereses y regalos por consultar</Link>.
+        <Link href="/admin/interests" className={LINK}>Intereses y regalos por consultar</Link>
+        {" · "}
+        <Link href="/admin/campaigns" className={LINK}>Campañas de encuentro</Link>.
       </p>
 
       {notice && (

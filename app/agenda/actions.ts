@@ -37,6 +37,7 @@ export async function submitBooking(
   const contactValue = str(formData, "contactValue").slice(0, 120);
   const clientTimeZone = str(formData, "clientTimeZone");
   const origin = str(formData, "origin").slice(0, 40) || null;
+  const campaignCode = str(formData, "campaignCode").slice(0, 12).toUpperCase() || null;
 
   if (!startsAt || Number.isNaN(Date.parse(startsAt))) {
     return { status: "error", message: "Elige una fecha y una hora." };
@@ -66,6 +67,7 @@ export async function submitBooking(
     contactValue: normalizeContact(contactChannel, contactValue),
     clientTimeZone,
     origin,
+    campaignCode,
   });
 
   if (!result.ok) {
@@ -74,6 +76,9 @@ export async function submitBooking(
       unavailable: "Ese horario ya no está disponible. Elige otro, por favor.",
       invalid_service: "Elige una sesión válida.",
       too_many: "Ya tienes reservas pendientes de pago con ese contacto. Escríbenos por WhatsApp para completarlas.",
+      campaign_unavailable: "La oferta de ese encuentro ya no está activa. No reservamos con el precio general sin avisarte: vuelve a la agenda sin el enlace del encuentro si quieres el precio general.",
+      campaign_not_eligible: "Ese contacto no aparece registrado en el encuentro. Usa el mismo WhatsApp o correo con el que te registraste, o escríbenos.",
+      campaign_sold_out: "Los cupos de esta oferta se acaban de agotar. Escríbenos para consultar disponibilidad general.",
     } as const;
     return { status: "error", message: messages[result.error] };
   }

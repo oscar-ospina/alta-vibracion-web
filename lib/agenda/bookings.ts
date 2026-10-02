@@ -7,8 +7,10 @@
 import { randomBytes } from "node:crypto";
 import { and, count, eq, gt, gte, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
+import { EXCLUSION_VIOLATION, UNIQUE_VIOLATION, pgError } from "@/db/errors";
 import type { Booking } from "@/db/schema";
 import { findService } from "@/lib/catalog";
+import { countPromoUsed, findCampaignByCode, isRegistered, lockAndViewCampaign, viewOf } from "@/lib/campaigns";
 import { loadAvailability } from "./availability";
 import { addMinutes } from "./time";
 
@@ -34,11 +36,27 @@ export type CreateBookingInput = {
   contactValue: string;
   clientTimeZone: string;
   origin: string | null;
+  /** Campaign code from /encuentros/<code>; the price is applied only when eligible. */
+  campaignCode?: string | null;
 };
+
+export type CreateBookingError =
+  | "slot_taken"
+  | "unavailable"
+  | "invalid_service"
+  | "too_many"
+  | "campaign_unavailable"
+  | "campaign_not_eligible"
+  | "campaign_sold_out";
 
 export type CreateBookingResult =
   | { ok: true; booking: Booking }
-  | { ok: false; error: "slot_taken" | "unavailable" | "invalid_service" | "too_many" };
+  | { ok: false; error: CreateBookingError };
+
+/** Thrown inside the booking transaction when the campaign's last cupo just went. */
+class SoldOut extends Error {}
+/** Thrown inside the booking transaction when the campaign closed or expired a moment earlier. */
+class CampaignGone extends Error {}
 
 /** Live holds one contact may have at once. Keeps a script from squatting the calendar. */
 export const MAX_PENDING_PER_CONTACT = 2;
@@ -59,18 +77,6 @@ export async function sweepExpiredHolds(
     );
 }
 
-/** Drizzle wraps driver errors; the SQLSTATE lives on the innermost cause. */
-function unwrapPgError(err: unknown): { code?: string; constraint?: string } | null {
-  let cur: unknown = err;
-  for (let i = 0; i < 5 && cur && typeof cur === "object"; i++) {
-    const e = cur as { code?: unknown; constraint?: unknown; cause?: unknown };
-    if (typeof e.code === "string" && /^\d{5}$/.test(e.code)) {
-      return { code: e.code, constraint: typeof e.constraint === "string" ? e.constraint : undefined };
-    }
-    cur = e.cause;
-  }
-  return null;
-}
 
 export async function createBooking(
   input: CreateBookingInput,
@@ -89,6 +95,20 @@ export async function createBooking(
   const holdExpiresAt = addMinutes(now, holdHours() * 60);
   const db = getDb();
 
+  // Campaign price: only for an active campaign, a registered contact and a
+  // free promo cupo. Anything else is an explicit error, never a silent
+  // fallback to the general price (plan section 5, last bullet). This
+  // pre-read fails fast; the transaction below re-checks under a row lock.
+  let campaign: Awaited<ReturnType<typeof findCampaignByCode>> = null;
+  if (input.campaignCode) {
+    campaign = await findCampaignByCode(input.campaignCode);
+    if (!campaign || campaign.serviceId !== service.id) return { ok: false, error: "campaign_unavailable" };
+    const view = viewOf(campaign, await countPromoUsed(campaign.id, now), now);
+    if (view === "sold_out") return { ok: false, error: "campaign_sold_out" };
+    if (view !== "active") return { ok: false, error: "campaign_unavailable" };
+    if (!(await isRegistered(campaign.id, input.contactValue))) return { ok: false, error: "campaign_not_eligible" };
+  }
+
   const [{ pending }] = await db
     .select({ pending: count() })
     .from(schema.bookings)
@@ -106,12 +126,24 @@ export async function createBooking(
     try {
       const booking = await db.transaction(async (tx) => {
         await sweepExpiredHolds(tx, now);
+        // The campaign's state under its row lock is what decides the price:
+        // a close, an expiry or the last cupo that landed after the pre-read
+        // is seen here. Buyers of one campaign are serialized by the lock.
+        let priceCop = service.price;
+        if (campaign) {
+          const locked = await lockAndViewCampaign(tx, campaign.id, now);
+          if (!locked) throw new CampaignGone();
+          if (locked.view === "sold_out") throw new SoldOut();
+          if (locked.view !== "active") throw new CampaignGone();
+          priceCop = locked.campaign.priceCop;
+        }
         const [row] = await tx
           .insert(schema.bookings)
           .values({
             code,
             serviceId: service.id,
-            priceCop: service.price,
+            priceCop,
+            campaignId: campaign?.id ?? null,
             startsAt,
             endsAt,
             holdExpiresAt,
@@ -128,9 +160,11 @@ export async function createBooking(
       });
       return { ok: true, booking };
     } catch (err) {
-      const pgErr = unwrapPgError(err);
-      // 23505 = unique (same start), 23P01 = exclusion (overlapping range).
-      if (pgErr?.code !== "23505" && pgErr?.code !== "23P01") throw err;
+      if (err instanceof SoldOut) return { ok: false, error: "campaign_sold_out" };
+      if (err instanceof CampaignGone) return { ok: false, error: "campaign_unavailable" };
+      const pgErr = pgError(err);
+      // Unique (same start) or exclusion (overlapping range): the slot is taken.
+      if (pgErr?.code !== UNIQUE_VIOLATION && pgErr?.code !== EXCLUSION_VIOLATION) throw err;
       if (pgErr.constraint === "bookings_code_idx") continue; // retry with a new code
       return { ok: false, error: "slot_taken" };
     }
@@ -212,8 +246,8 @@ export async function setBookingStatus(
     if (!row) return { ok: false, error: "not_pending" };
     return { ok: true, booking: row };
   } catch (err) {
-    const code = unwrapPgError(err)?.code;
-    if (code === "23505" || code === "23P01") return { ok: false, error: "slot_taken" };
+    const code = pgError(err)?.code;
+    if (code === UNIQUE_VIOLATION || code === EXCLUSION_VIOLATION) return { ok: false, error: "slot_taken" };
     throw err;
   }
 }

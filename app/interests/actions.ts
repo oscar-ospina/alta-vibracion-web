@@ -2,6 +2,7 @@
 
 import { hasDatabase } from "@/db/client";
 import { contactError, isContactChannel, isValidContact, normalizeContact } from "@/lib/contact";
+import { CAMPAIGN_CODE_RE, findCampaignByCode } from "@/lib/campaigns";
 import { interestKindFor, saveInterest } from "@/lib/interests";
 
 /**
@@ -14,7 +15,7 @@ import { interestKindFor, saveInterest } from "@/lib/interests";
 export type InterestFormState =
   | { status: "idle" }
   | { status: "error"; message: string; fallback: boolean }
-  | { status: "saved"; kind: "service" | "gift" | "company"; serviceId: string };
+  | { status: "saved"; kind: "service" | "gift" | "company" | "campaign"; serviceId: string };
 
 const FALLBACK = "No pudimos guardar tu registro. Escríbenos por WhatsApp y lo anotamos a mano.";
 
@@ -28,8 +29,12 @@ export async function submitInterest(
   formData: FormData,
 ): Promise<InterestFormState> {
   const serviceId = str(formData, "serviceId", 20);
-  const kind = interestKindFor(serviceId);
+  const campaignCode = str(formData, "campaignCode", 12).toUpperCase();
+  const kind = campaignCode ? "campaign" : interestKindFor(serviceId);
   if (!kind) return { status: "error", message: "Elige una propuesta válida.", fallback: false };
+  if (campaignCode && !CAMPAIGN_CODE_RE.test(campaignCode)) {
+    return { status: "error", message: "El enlace del encuentro no es válido.", fallback: false };
+  }
 
   const preferredName = str(formData, "preferredName", 80);
   const contactChannel = str(formData, "contactChannel", 10);
@@ -58,9 +63,19 @@ export async function submitInterest(
   if (!hasDatabase()) return { status: "error", message: FALLBACK, fallback: true };
 
   try {
+    let campaignId: string | null = null;
+    if (kind === "campaign") {
+      const campaign = await findCampaignByCode(campaignCode);
+      // Registration is open only while the campaign collects interest.
+      if (!campaign || campaign.status !== "interest") {
+        return { status: "error", message: "El registro de este encuentro ya no está abierto.", fallback: false };
+      }
+      campaignId = campaign.id;
+    }
     const res = await saveInterest({
       kind,
-      serviceId,
+      serviceId: kind === "campaign" ? "yo-01" : serviceId,
+      campaignId,
       preferredName,
       contactChannel,
       contactValue: normalizeContact(contactChannel, contactRaw),

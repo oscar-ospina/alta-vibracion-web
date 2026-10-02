@@ -10,18 +10,20 @@ import { whatsappUrl } from "@/lib/site";
 const FOCUS_RING =
   "focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-export type InterestVariant = "service" | "company" | "gift";
+export type InterestVariant = "service" | "company" | "gift" | "campaign";
 
 const THANKS: Record<InterestVariant, string> = {
   service: "Gracias. Te avisaremos cuando tengamos una propuesta lista.",
   company: "Gracias. Te escribimos para conversar sobre lo que quieres explorar.",
   gift: "Gracias. Liliana te escribirá para confirmar disponibilidad, forma de entrega y condiciones antes de cualquier pago.",
+  campaign: "Gracias. Cuando el grupo se complete, Liliana te compartirá las condiciones y el acceso para reservar. Todavía no hay pago ni reserva.",
 };
 
 const CONSENT: Record<InterestVariant, string> = {
   service: "Autorizo que me avisen por este canal cuando esta propuesta esté disponible.",
   company: "Autorizo que me contacten por este canal para conversar sobre esta propuesta.",
   gift: "Autorizo que me contacten por este canal para atender esta consulta.",
+  campaign: "Autorizo que me avisen por este canal cuando se active la oferta de este encuentro.",
 };
 
 /**
@@ -31,7 +33,16 @@ const CONSENT: Record<InterestVariant, string> = {
  * optional message and never asks about the beneficiary. Shows the plan's
  * thanks only after the server saved the row; a failure offers WhatsApp.
  */
-export function InterestForm({ service, variant }: { service: Service; variant: InterestVariant }) {
+export function InterestForm({
+  service,
+  variant,
+  campaignCode,
+}: {
+  service: Service;
+  variant: InterestVariant;
+  /** Variant `campaign`: the event code from /encuentros/<code>. */
+  campaignCode?: string;
+}) {
   const [state, formAction, pending] = useActionState<InterestFormState, FormData>(
     submitInterest,
     { status: "idle" },
@@ -55,7 +66,7 @@ export function InterestForm({ service, variant }: { service: Service; variant: 
     return (
       <div role="status" data-testid="interest-saved" className="rounded-xl bg-orange-50 p-4 text-sm">
         <p className="font-semibold text-brand-ink">{THANKS[variant]}</p>
-        <p className="mt-1 text-muted-foreground">{EXPECTATION_NOTE}</p>
+        {variant !== "campaign" && <p className="mt-1 text-muted-foreground">{EXPECTATION_NOTE}</p>}
       </div>
     );
   }
@@ -63,6 +74,7 @@ export function InterestForm({ service, variant }: { service: Service; variant: 
   return (
     <form action={formAction} className="flex flex-col gap-4" data-testid="interest-form">
       <input type="hidden" name="serviceId" value={service.id} />
+      {campaignCode && <input type="hidden" name="campaignCode" value={campaignCode} />}
 
       <div>
         <Label htmlFor={`${uid}-name`}>Tu nombre</Label>
