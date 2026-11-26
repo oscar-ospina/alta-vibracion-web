@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { gte } from "drizzle-orm";
-import { Button, Card, CardContent, Input, Label, cn } from "@saas/ui";
-import { getDb, hasDatabase, schema } from "@/db/client";
+import { Button, cn } from "@saas/ui";
+import { hasDatabase, schema } from "@/db/client";
 import { listUpcomingBookings } from "@/lib/agenda/bookings";
 import {
   FOLLOW_UP_DAYS,
@@ -13,11 +12,11 @@ import {
   reportsByBookingId,
   type BookingWithReport,
 } from "@/lib/agenda/delivery";
-import { BOGOTA, formatInZone, formatLongDate, todayInBogota } from "@/lib/agenda/time";
+import { BOGOTA, formatInZone } from "@/lib/agenda/time";
 import { bookingServiceLabel, formatCOP } from "@/lib/catalog";
 import { displayContact } from "@/lib/contact";
 import { REPORT_STATUS_LABEL, STAGE_LABEL, STATUS_LABEL, adminNotice } from "@/lib/agenda/labels";
-import { addOverride, cancelBooking, confirmBooking, deleteOverride } from "./actions";
+import { cancelBooking, confirmBooking } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +24,6 @@ export const metadata: Metadata = {
   title: "Administración de agenda",
   robots: { index: false, follow: false },
 };
-
-const FOCUS_RING =
-  "focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 const LINK = "text-brand-ink underline underline-offset-2";
 
@@ -54,8 +50,8 @@ function PendingList({ rows, testId, empty }: { rows: { id: string; code: string
 
 /**
  * Private admin: upcoming bookings with confirm/cancel, the three pending
- * lists from the plan (forms, deliveries, day-14 follow-ups) and per-date
- * availability exceptions. Page loads are challenged by proxy.ts; each action
+ * lists from the plan (forms, deliveries, day-14 follow-ups). The schedule
+ * lives in /admin/schedule. Page loads are challenged by proxy.ts; each action
  * re-checks credentials itself.
  */
 export default async function AdminPage({
@@ -74,19 +70,13 @@ export default async function AdminPage({
   }
   const now = new Date();
   let bookings: Awaited<ReturnType<typeof listUpcomingBookings>> = [];
-  let overrides: (typeof schema.availabilityOverrides.$inferSelect)[] = [];
   let reports = new Map<string, typeof schema.reports.$inferSelect>();
   let pendingIntake: Awaited<ReturnType<typeof listPendingIntake>> = [];
   let pendingDeliveries: BookingWithReport[] = [];
   let followUps: Awaited<ReturnType<typeof listFollowUpsDue>> = [];
   try {
-    [bookings, overrides, reports, pendingIntake, pendingDeliveries, followUps] = await Promise.all([
+    [bookings, reports, pendingIntake, pendingDeliveries, followUps] = await Promise.all([
       listUpcomingBookings(now),
-      getDb()
-        .select()
-        .from(schema.availabilityOverrides)
-        .where(gte(schema.availabilityOverrides.date, todayInBogota(now)))
-        .orderBy(schema.availabilityOverrides.date),
       reportsByBookingId(),
       listPendingIntake(),
       listPendingDeliveries(),
@@ -215,58 +205,11 @@ export default async function AdminPage({
       </p>
       <PendingList rows={followUps} testId="follow-ups" empty="Ningún seguimiento pendiente." />
 
-      <h2 className="mt-10 text-xl font-bold text-foreground">Excepciones de disponibilidad</h2>
+      <h2 className="mt-10 text-xl font-bold text-foreground">Horarios y vacaciones</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        La regla base es lunes a jueves a las 18:00. Aquí cierras un día completo, cierras
-        una hora concreta o abres una hora extra (por ejemplo una mañana para España).
+        El horario semanal, los días bloqueados y las horas extra están en{" "}
+        <Link href="/admin/schedule" className={LINK}>Horarios y vacaciones</Link>.
       </p>
-      <Card className="mt-3">
-        <CardContent>
-          <form action={addOverride} className="grid gap-4 md:grid-cols-[1fr_1fr_1fr_2fr_auto] md:items-end">
-            <div>
-              <Label htmlFor="ov-date">Fecha</Label>
-              <Input id="ov-date" name="date" type="date" required className="mt-2" />
-            </div>
-            <div>
-              <Label htmlFor="ov-kind">Tipo</Label>
-              <select
-                id="ov-kind"
-                name="kind"
-                className={cn("mt-2 h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm", FOCUS_RING)}
-              >
-                <option value="closed">Cerrar</option>
-                <option value="extra">Hora extra</option>
-              </select>
-            </div>
-            <div>
-              <Label htmlFor="ov-time">Hora (vacío = todo el día)</Label>
-              <Input id="ov-time" name="time" type="time" className="mt-2" />
-            </div>
-            <div>
-              <Label htmlFor="ov-note">Nota</Label>
-              <Input id="ov-note" name="note" maxLength={200} className="mt-2" />
-            </div>
-            <Button type="submit">Guardar</Button>
-          </form>
-        </CardContent>
-      </Card>
-      {overrides.length > 0 && (
-        <ul className="mt-4 space-y-2 text-sm" data-testid="overrides-list">
-          {overrides.map((o) => (
-            <li key={o.id} className="flex items-center justify-between gap-4 rounded-lg border px-3 py-2">
-              <span>
-                {formatLongDate(o.date)} · {o.kind === "closed" ? "Cerrado" : "Extra"}
-                {o.time ? ` ${o.time}` : " (todo el día)"}
-                {o.note && <span className="text-muted-foreground"> · {o.note}</span>}
-              </span>
-              <form action={deleteOverride}>
-                <input type="hidden" name="id" value={o.id} />
-                <Button size="sm" variant="outline" type="submit">Quitar</Button>
-              </form>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

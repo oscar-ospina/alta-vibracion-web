@@ -8,7 +8,7 @@ The agenda stores availability rules, per-date exceptions and bookings in Postgr
 docker run -d --name av-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=altavibracion -p 5432:5432 postgres:16
 cp .env.example .env.local          # DATABASE_URL already points at the container
 npm run db:migrate                  # applies drizzle/*.sql
-npm run db:seed                     # Monday–Thursday 18:00, 135 min
+npm run db:seed                     # Monday–Thursday 18:00, 135 min (only on an empty rules table)
 npm run dev
 ```
 
@@ -70,7 +70,7 @@ npm run db:migrate
 
 ### Day to day
 
-Liliana opens `/admin` (Basic auth), confirms a booking after seeing the transfer, or cancels it. She closes days or adds an extra slot in the exceptions form. Confirmed sessions she copies to her own calendar by hand.
+Liliana opens `/admin` (Basic auth), confirms a booking after seeing the transfer, or cancels it. In `/admin/schedule` she edits the weekly rules (add, deactivate, delete), blocks a vacation range (one full-day closure per date, shown as one row with a "Reabrir" button), closes a single hour or opens an extra one. Blocking days never cancels a booking: the page lists the live bookings inside each blocked range so she can move or cancel them. The seed only runs on an empty rules table, so it never brings back a rule she deleted. Every admin page carries a bar with the admin sections and the public pages. Confirmed sessions she copies to her own calendar by hand.
 
 After confirming, each booking's code links to its own page. There she marks the pre-session form as received when it arrives (the form itself is external), marks the session as attended once it happened, writes the summary from the template and saves it as draft, reviewed or approved. Only the approved text appears on the client's `/agenda/<code>` page; saving it again as draft hides it. Fourteen days after the session the booking shows up under "Seguimiento del día 14" until she marks the follow-up done. `/admin/script` holds the operating script and the seven-day plan.
 
