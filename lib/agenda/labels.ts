@@ -56,6 +56,12 @@ export const ADMIN_NOTICE = {
   bad_status: "Estado del informe no válido.",
   interest_not_found: "Ese interés ya no existe.",
   interest_bad_status: "Estado del interés no válido.",
+  bad_weekday: "Elige un día de la semana.",
+  bad_duration: "La duración debe estar entre 30 y 300 minutos y terminar antes de la medianoche.",
+  rule_overlap: "Ese horario se cruza con otro activo el mismo día. Desactiva el otro primero.",
+  rule_not_found: "Ese horario ya no existe.",
+  bad_range: "La fecha final debe ser igual o posterior a la inicial.",
+  range_too_long: "Un bloqueo puede cubrir hasta 120 días. Divídelo en dos.",
 } as const;
 
 export type AdminNoticeKey = keyof typeof ADMIN_NOTICE;
